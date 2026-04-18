@@ -9,6 +9,8 @@ use crate::route::Route;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mapping {
     pub mapping_id: Uuid,
+    #[serde(default)]
+    pub edge_id: String,
     pub device_type: String,
     pub device_id: String,
     pub service_type: String,
@@ -46,6 +48,7 @@ impl Mapping {
     ) -> Self {
         Self {
             mapping_id: Uuid::new_v4(),
+            edge_id: String::new(),
             device_type: device_type.to_string(),
             device_id: device_id.to_string(),
             service_type: service_type.to_string(),

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
-use tokio::sync::mpsc;
 
 use weave_engine::{InputPrimitive, RoutedIntent, RoutingEngine};
 

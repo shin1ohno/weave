@@ -53,8 +53,10 @@ impl MappingStore for MemoryStore {
 
     async fn update_mapping(&self, mapping: &Mapping) -> Result<(), StoreError> {
         let mut mappings = self.mappings.lock().unwrap();
-        if mappings.contains_key(&mapping.mapping_id) {
-            mappings.insert(mapping.mapping_id, mapping.clone());
+        if let std::collections::hash_map::Entry::Occupied(mut e) =
+            mappings.entry(mapping.mapping_id)
+        {
+            e.insert(mapping.clone());
             Ok(())
         } else {
             Err(StoreError::NotFound(mapping.mapping_id.to_string()))

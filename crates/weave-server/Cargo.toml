@@ -5,13 +5,18 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 uuid = { workspace = true }
 weave-engine = { path = "../weave-engine" }
+weave-contracts = { path = "../../../edge-agent/crates/weave-contracts" }
 rumqttc = "0.24"
 serde = { workspace = true }
 serde_json = { workspace = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate", "uuid"] }
 tokio = { workspace = true }
+futures-util = "0.3"
+async-trait = "0.1"
+thiserror = { workspace = true }
 tower-http = { version = "0.6", features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
