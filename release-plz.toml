@@ -9,3 +9,6 @@ name = "weave-engine"
 
 [[package]]
 name = "weave-server"
+# release-plz の比較が weave-server 0.1.0 の壊れた Cargo.toml.orig で失敗するため
+# 一時的に release を無効化。次バージョンから有効化する予定
+release = false
