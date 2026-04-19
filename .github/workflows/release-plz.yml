@@ -1,8 +1,9 @@
 name: release-plz
 
+# release-plz currently fails because weave-server 0.1.0 was published with a
+# path-fallback Cargo.toml.orig that references ../../../edge-agent. Once that
+# version is yanked (token needs yank permission), re-enable the push trigger.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
