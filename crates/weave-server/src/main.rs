@@ -1,4 +1,5 @@
 mod api;
+mod glyphs;
 mod mqtt;
 mod sqlite_store;
 mod ws_edge;
@@ -30,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let store = Arc::new(SqliteStore::connect(&database_url).await?);
     tracing::info!(database_url = %database_url, "sqlite store ready");
+    glyphs::seed_defaults(&store).await?;
 
     let engine = Arc::new(RoutingEngine::new());
     let mappings = store.list_mappings().await?;
@@ -52,11 +54,15 @@ async fn main() -> anyhow::Result<()> {
         store: store.clone(),
     });
     let api_router = api::router(app_state);
+    let glyph_router = glyphs::router(store.clone());
     let ws_router = Router::new()
         .route("/ws/edge", get(ws_edge::handler))
         .with_state(store);
 
-    let app = api_router.merge(ws_router).layer(CorsLayer::permissive());
+    let app = api_router
+        .merge(glyph_router)
+        .merge(ws_router)
+        .layer(CorsLayer::permissive());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", api_port)).await?;
     tracing::info!(api_port, "HTTP + WS listening");

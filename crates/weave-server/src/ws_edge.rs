@@ -77,10 +77,19 @@ async fn handle_socket(socket: WebSocket, store: Arc<SqliteStore>) {
                     })
                     .collect();
 
+                let glyph_set = match store.list_glyphs().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::warn!(error = %e, "failed to load glyphs; shipping empty set");
+                        Vec::new()
+                    }
+                };
+
                 let frame = ServerToEdge::ConfigFull {
                     config: EdgeConfig {
                         edge_id: eid,
                         mappings: contract_mappings,
+                        glyphs: glyph_set,
                     },
                 };
 

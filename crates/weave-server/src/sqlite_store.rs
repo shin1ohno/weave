@@ -8,6 +8,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 use sqlx::ConnectOptions;
 use std::str::FromStr;
 
+use weave_contracts::Glyph;
 use weave_engine::{Mapping, MappingStore, StoreError};
 
 pub struct SqliteStore {
@@ -22,6 +23,69 @@ impl SqliteStore {
         let pool = SqlitePool::connect_with(opts).await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self { pool })
+    }
+
+    /// List every glyph stored in the registry.
+    pub async fn list_glyphs(&self) -> Result<Vec<Glyph>, StoreError> {
+        let rows: Vec<(String, String, i64)> =
+            sqlx::query_as("SELECT name, pattern, builtin FROM glyphs ORDER BY name")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|(name, pattern, builtin)| Glyph {
+                name,
+                pattern,
+                builtin: builtin != 0,
+            })
+            .collect())
+    }
+
+    pub async fn get_glyph(&self, name: &str) -> Result<Option<Glyph>, StoreError> {
+        let row: Option<(String, String, i64)> =
+            sqlx::query_as("SELECT name, pattern, builtin FROM glyphs WHERE name = ?")
+                .bind(name)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(row.map(|(name, pattern, builtin)| Glyph {
+            name,
+            pattern,
+            builtin: builtin != 0,
+        }))
+    }
+
+    pub async fn upsert_glyph(&self, glyph: &Glyph) -> Result<(), StoreError> {
+        sqlx::query(
+            "INSERT INTO glyphs (name, pattern, builtin) VALUES (?, ?, ?)
+             ON CONFLICT(name) DO UPDATE SET pattern = excluded.pattern, builtin = excluded.builtin",
+        )
+        .bind(&glyph.name)
+        .bind(&glyph.pattern)
+        .bind(i64::from(glyph.builtin))
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn delete_glyph(&self, name: &str) -> Result<bool, StoreError> {
+        let rows = sqlx::query("DELETE FROM glyphs WHERE name = ?")
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?
+            .rows_affected();
+        Ok(rows > 0)
+    }
+
+    pub async fn glyph_count(&self) -> Result<i64, StoreError> {
+        let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM glyphs")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(n)
     }
 
     /// Fetch every mapping belonging to `edge_id`. Used by `/ws/edge` to build
