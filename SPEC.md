@@ -1,141 +1,162 @@
-# weave: IoT Device ↔ Service Routing Engine
+# weave: IoT Device ↔ Service Routing
 
 ## Summary
 
-物理 IoT デバイス（Nuimo、StreamDeck、HueDial 等）の操作を、サービス（Roon、照明、エアコン等）のコマンドに変換するルーティングエンジン。デバイスは「操作プリミティブ」(rotate, press, swipe) を MQTT に publish し、ルーターが設定に基づいてサービスの「意図」(volume, play, brightness) に変換して MQTT に publish する。マッピングは MCP/API 経由で動的に変更可能。
+物理 IoT デバイス（Nuimo、StreamDeck、HueDial 等）の操作を、サービス（Roon、照明、エアコン等）のコマンドに変換するルーティング基盤。**2 つの独立した経路を並存させる設計**:
+
+- **直結 edge-agent 経路（推奨 / 低レイテンシ）**: 各デバイスホストで `edge-agent` バイナリが稼働。Nuimo 等の BLE デバイスをローカルで受け、Rust SDK 経由で Roon/Hue 等に直接コマンドを打つ。weave-server とは WebSocket で config / state をやり取り。
+- **MQTT 経路（N:N クロスホスト向け）**: デバイス driver（例: `nuimo-mqtt`）とサービス adapter（例: `roon-hub`）が MQTT broker を挟んで疎結合に疎通。weave-engine が入力 primitive → サービス intent のルーティングを担う。
+
+両経路とも同じ weave-server を設定基盤として共有する。マッピングは REST API + Web UI 経由で動的変更可能。
 
 ## Requirements
 
 ### Must
 
-1. **操作プリミティブ → 意図変換**: デバイスの物理操作 (rotate, press, long_press, swipe, slide, hover) をサービスの意図 (play, volume_change, next, brightness_up) にマッピング
-2. **設定駆動のマッピング**: マッピングは DB (DynamoDB) に保存。コード変更なしでマッピングを追加・変更可能
-3. **動的変更**: MCP tool または REST API でマッピングをランタイム変更可能（リスタート不要）
-4. **複数デバイス → 複数サービス**: N:M のマッピング。1台の Nuimo が Roon volume と照明 brightness を同時制御可能
-5. **Zone/Target 動的切替**: MCP/API 経由でデバイスのアクティブターゲット（Roon zone、照明グループ等）を切り替え
-6. **BLE 切断時のグレースフル動作**: デバイス切断をルーター側で検知し、再接続時にマッピングを自動復帰
-7. **低レイテンシ**: Nuimo rotate → volume 変更の体感遅延 < 100ms（MQTT 経由）
-
-8. **Web UI**: React/Next.js でマッピング設定・状態確認・ターゲット切替ができる画面。weave が REST API を提供し、フロントエンドは別プロセス
+1. **操作プリミティブ → 意図変換**: デバイスの物理操作 (rotate, press, long_press, swipe, slide, hover) をサービスの意図 (play, volume_change, next, brightness_change) にマッピング
+2. **設定駆動のマッピング**: マッピングは SQLite に永続化。コード変更なしでマッピングを追加・変更可能
+3. **動的変更**: REST API で更新した瞬間に edge-agent へ `config_patch` を push。edge-agent 再起動不要
+4. **複数デバイス → 複数サービス**: N:M マッピング。1 台の Nuimo が Roon volume と照明 brightness を同時制御可能
+5. **Zone/Target 動的切替**: REST `POST /api/mappings/{id}/target` で切替。edge-agent に即時反映
+6. **BLE 切断時のグレースフル動作**: edge-agent がローカルでマッピングをキャッシュ保持。BLE 再接続時に復帰
+7. **低レイテンシ**: Nuimo rotate → Roon volume 変更の体感遅延 < 100ms（直結経路で実測 <10ms 目安）
+8. **Web UI**: Next.js でマッピング設定・live state 表示・glyph 編集・edge 一覧・target 切替
 9. **フィードバックループ**: サービスの状態変更 → デバイスの表示更新（Roon playing → Nuimo LED play icon）
-10. **dampingFactor / 感度設定**: rotate → volume の変換係数を設定可能
+10. **dampingFactor / 感度設定**: rotate → volume の変換係数を per-route に設定可能
 
 ### Should
 
-11. **MCP tools**: Claude から `list_mappings`, `update_mapping`, `switch_target` を呼べる
+11. **Glyph ライブラリ**: weave に集約、Web UI で編集。ASCII プレビュー併記の 9x9 click-to-toggle エディタ
 12. **プリセット**: よく使うマッピング（Nuimo+Roon、StreamDeck+照明）のテンプレート
+13. **MCP tools**: Claude から `list_mappings`, `update_mapping`, `switch_target` を呼べる
 
 ### Could
 
-13. **条件付きルーティング**: 時間帯やモードによってマッピングを切り替え
-14. **マクロ**: 1操作で複数サービスに同時発行（rotate で volume + brightness を同時制御）
-15. **デバイス操作での zone 切替**: Nuimo の特定ジェスチャーで zone 切替（API に加えて）
+14. **条件付きルーティング**: 時間帯やモードによってマッピングを切り替え
+15. **マクロ**: 1 操作で複数サービスに同時発行
+16. **デバイス操作での zone 切替**: Nuimo の特定ジェスチャーで zone 切替
 
 ## Non-requirements
 
-- デバイスの BLE 接続管理（nuimo-mqtt 等が担当）
-- サービスの直接制御（roon-hub 等が担当）
-- ユーザー認証・マルチテナント（シングルユーザー前提）
-- Settings サービス（Roon UI 内の設定画面）
+- デバイスの BLE 接続管理（edge-agent / nuimo-mqtt が担当）
+- サービスの直接制御ロジック（adapter-roon / roon-hub が担当）
+- ユーザー認証・マルチテナント（シングルユーザー・LAN 閉域前提）
 
 ## Technical Approach
 
-### アーキテクチャ
+### 経路 A: 直結 edge-agent（推奨）
 
 ```
-デバイス層                  ルーティング層                        サービス層
-─────────                  ──────────                          ─────────
-nuimo-mqtt ──┐             weave (Rust)                 ┌── roon-hub
-streamdeck ──├→ MQTT ──→  ├ MQTT routing engine          ──→ MQTT ──┤── hue-bridge
-huedial ─────┘             ├ REST API (axum)                └── aircon-ctrl
-                           ├ DB (DynamoDB)
-                           │
-                           weave-web (Next.js)
-                           └ Web UI for config & monitoring
+[edge-agent × N] (デバイスホストごと)                 [weave (サーバ)]
+ ├ device driver (nuimo / streamdeck / ...)          ├ SQLite
+ ├ routing engine (primitive → intent)               ├ REST API (axum)
+ ├ service adapters (Cargo feature)                  ├ /ws/edge (config push, state receive)
+ │  ├ adapter-roon → Roon Core via roon-api          ├ /ws/ui   (state fan-out, mapping/glyph diff)
+ │  └ adapter-hue  → Hue Bridge                      └ Next.js Web UI
+ └ ws client (/ws/edge) ─────── WebSocket ──────────►
+                                                      ▲
+                                                      │ ブラウザから /ws/ui
 ```
 
-### MQTT トピック設計
+- edge-agent は自前の `extension_id` で Roon に登録し、同一 LAN 上の Roon Core と直接 MOO RPC
+- config_server 不在時はローカルキャッシュ (`~/.local/state/edge-agent/config-cache-${edge_id}.json`) で稼働継続
 
-**デバイス → ルーター (操作プリミティブ)**:
-```
-device/{type}/{id}/input/{primitive}
-  例: device/nuimo/c381df4e/input/rotate     payload: {"delta": 0.03}
-      device/nuimo/c381df4e/input/press      payload: {}
-      device/streamdeck/sd1/input/key_press  payload: {"key": 3}
-```
+### 経路 B: MQTT bus（N:N クロスホスト向け）
 
-**ルーター → サービス (意図)**:
 ```
-service/{type}/{target_id}/command/{intent}
-  例: service/roon/16017ec9318.../command/volume_change  payload: {"delta": 3}
-      service/roon/16017ec9318.../command/play            payload: {}
-      service/hue/group-1/command/brightness               payload: {"delta": 10}
+デバイス層                      ルーティング層                  サービス層
+──────────                    ───────────                    ────────
+nuimo-mqtt ──┐                 weave (-engine)          ┌── roon-hub
+streamdeck ──├→ mosquitto ──→ ├ subscribe device/+    ──→ mosquitto ──┤── hue-bridge
+huedial ─────┘                 └ publish  service/+           └── aircon-ctrl
 ```
 
-**サービス → ルーター → デバイス (フィードバック)**:
-```
-service/{type}/{target_id}/state/{property}
-  例: service/roon/16017ec9318.../state/playback    payload: "playing"
-      service/roon/16017ec9318.../state/volume      payload: 50
+- topic 規約:
+  - `device/{type}/{id}/input/{primitive}` — デバイス入力
+  - `service/{type}/{target}/command/{intent}` — サービス コマンド
+  - `service/{type}/{target}/state/{property}` — サービス 状態（retained）
+  - `device/{type}/{id}/feedback/{type}` — デバイス フィードバック
+- `roon-hub` は単一のコンテナが mosquitto 経由でコマンドを受け、Roon state を retained publish
+- ホスト A の StreamDeck → ホスト B の Hue、のような跨ぎ運用が自然
 
-device/{type}/{id}/feedback/{type}
-  例: device/nuimo/c381df4e/feedback/glyph       payload: {"glyph": "play", "brightness": 1.0}
-```
+### どちらを選ぶか
 
-### マッピング設定 (DB スキーマ)
+| 判断軸 | 直結 edge-agent | MQTT 経路 |
+|---|---|---|
+| デバイス数 | N ≤ 5、同一 LAN | N 規模で地理的に分散 |
+| レイテンシ要件 | <10ms 望む（音量操作など） | <100ms で許容 |
+| 障害分離 | エッジごとに独立 | broker が単一障害点 |
+| クロスホスト N:M | 追加設計が必要 | バス上で自然 |
+| 複数の独立した dashboard | /ws/ui から fan-out | retained message で各購読者が state 同期 |
+| 運用負担 | エッジホストごとに 1 プロセス | broker + 各 adapter プロセス |
+
+家庭内・Roon 1 台・ホスト近接 Nuimo の本プロジェクトでは **A が主**、将来 N:N に広げたくなった時用に B を温存している。
+
+### マッピング設定
 
 ```json
 {
   "mapping_id": "uuid",
+  "edge_id": "living-room",
   "device_type": "nuimo",
   "device_id": "C3:81:DF:4E:FF:6A",
   "service_type": "roon",
-  "service_target": "16017ec93184841af2731e71ce1454ed0316",
+  "service_target": "16017ec931848...",
   "routes": [
     {"input": "rotate", "intent": "volume_change", "params": {"damping": 80}},
-    {"input": "press", "intent": "playpause"},
-    {"input": "swipe_right", "intent": "next"},
-    {"input": "swipe_left", "intent": "previous"}
+    {"input": "press",  "intent": "play_pause"}
   ],
   "feedback": [
-    {"state": "playback", "feedback_type": "glyph", "mapping": {"playing": "play", "paused": "pause"}},
-    {"state": "volume", "feedback_type": "glyph", "mapping": "volume_bar"}
+    {"state": "playback", "feedback_type": "glyph", "mapping": {"playing": "play", "paused": "pause"}}
   ],
   "active": true
 }
 ```
 
-`device_id` と `service_target` はそれぞれのシステムが発行する固有 ID をそのまま使用する（Nuimo = BLE address、Roon = zone_id/output_id、Hue = group ID 等）。Web UI ではこれらに human-readable な display_name を併記する。
+- `edge_id`（経路 A 用）: どのエッジに配信するかのキー。経路 B では空文字のまま
+- `device_id` / `service_target` は発行側の固有 ID をそのまま使用
+- routes の評価順は先勝ち（最初にマッチした入力で停止）
 
 ### 実装構成
 
-- **weave** (Rust binary): MQTT ルーティングエンジン + REST API (axum)。nuimo-rs workspace に追加
-- **weave-web** (Next.js): Web UI。マッピング設定、デバイス/サービス状態表示、ターゲット切替。REST API を呼ぶ
-- **DB**: DynamoDB (既存インフラ活用)
-- **REST API endpoints**:
-  - `GET /api/mappings` — 全マッピング一覧
-  - `POST /api/mappings` — マッピング作成
-  - `PUT /api/mappings/{id}` — マッピング更新
-  - `DELETE /api/mappings/{id}` — マッピング削除
-  - `POST /api/mappings/{id}/target` — アクティブターゲット切替
-  - `GET /api/devices` — 接続中デバイス一覧
-  - `GET /api/services` — 利用可能サービス一覧
-- **MCP tools** (Should): REST API のラッパー
+| コンポーネント | 役割 | 実装 |
+|---|---|---|
+| `crates/weave-server` | config + state hub、REST + WS | axum 0.7, sqlx SQLite |
+| `crates/weave-engine` | MQTT routing（経路 B） | MQTT bridge + engine |
+| `crates/weave-contracts` | WS protocol 型（別リポ: edge-agent 内） | serde |
+| `weave-web/` | Next.js 16 UI | React 19 + Tailwind 4 |
+
+### REST API
+
+| エンドポイント | メソッド | 用途 |
+|---|---|---|
+| `/api/mappings` | GET / POST | 一覧 / 作成 |
+| `/api/mappings/{id}` | GET / PUT / DELETE | 取得 / 更新 / 削除 |
+| `/api/mappings/{id}/target` | POST | アクティブターゲット切替 |
+| `/api/glyphs` | GET | glyph 一覧 |
+| `/api/glyphs/{name}` | GET / PUT / DELETE | 取得 / upsert / 削除 |
+| `/ws/edge` | WS | edge-agent 用（config push / state receive） |
+| `/ws/ui` | WS | Web UI 用（snapshot + incremental UiFrame） |
+
+mutation 系エンドポイントは成功時に:
+- `push_broker` 経由で該当 edge に `ConfigPatch` / `GlyphsUpdate` を push
+- `state_hub` 経由で全 UI クライアントに `MappingChanged` / `GlyphsChanged` を broadcast
 
 ## Edge Cases
 
 | ケース | 動作 |
 |---|---|
-| デバイス BLE 切断 | ルーターはマッピングを保持。デバイス再接続時に自動復帰。切断中のコマンドはドロップ |
-| サービス不在 | MQTT publish は fire-and-forget。サービスが復帰すれば自動的に繋がる |
-| マッピング変更中の操作 | 新マッピングは即時適用。処理中のイベントは旧マッピングで完了 |
-| 同一入力→複数サービス | routes 配列に複数エントリ。順次 publish |
-| レイテンシ劣化 | MQTT は QoS 0 (AtMostOnce) を使用し遅延最小化。volume は特にスロットリングなし |
+| edge-agent が weave-server に繋がらない | ローカル cache で稼働継続、再接続時に snapshot 受信 |
+| weave-server 再起動 | SQLite 永続化で mapping / glyph 復元、edge-agent は自動再接続 |
+| 同一入力→複数サービス | routes 配列に複数エントリを書けば順次 publish（直結経路）または MQTT fan-out（経路 B） |
+| BLE 切断 | edge-agent が `device/{type}/{id}/state/connected=false` を WS で通知、再接続で自動復帰 |
+| glyph 編集中 | PUT 成功 → `GlyphsUpdate` が全 edge に push、LED 表示に即時反映 |
+| MQTT broker 不在（経路 B 未使用時） | weave-server は `WEAVE_DISABLE_MQTT=1` で完全無効化、直結経路のみ稼働 |
 
 ## Acceptance Criteria
 
-1. Nuimo の rotate が Roon の volume_change として届く（< 100ms）
-2. MCP tool で `switch_target` を呼ぶと、同じ Nuimo が別の zone を操作する
-3. マッピング設定を DB に保存し、ルーター再起動後に復帰する
-4. Roon の再生状態が変わると Nuimo に LED フィードバックが表示される
-5. 設定変更にコードの変更やリビルドが不要
+1. Nuimo の rotate が Roon の volume_change として届く（< 100ms、直結経路）
+2. REST で `switch_target` を呼ぶと、同じ Nuimo が別の zone を操作する
+3. mapping / glyph を編集すると、edge-agent 再起動なしで挙動が変わる
+4. Roon の再生状態が Web UI にライブ表示される（/ws/ui 経由）
+5. edge-agent 2 台を別ホストで起動しても、各々が自分の `edge_id` の mapping だけを受信する
