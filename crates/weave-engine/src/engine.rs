@@ -88,11 +88,7 @@ impl RoutingEngine {
     }
 
     /// Update the service_target for a mapping (zone/target switch).
-    pub async fn switch_target(
-        &self,
-        mapping_id: uuid::Uuid,
-        new_target: &str,
-    ) -> bool {
+    pub async fn switch_target(&self, mapping_id: uuid::Uuid, new_target: &str) -> bool {
         let mut mappings = self.mappings.write().await;
         if let Some(mapping) = mappings.iter_mut().find(|m| m.mapping_id == mapping_id) {
             mapping.service_target = new_target.to_string();
@@ -153,7 +149,11 @@ mod tests {
         engine.load_mappings(vec![test_mapping()]).await;
 
         let results = engine
-            .route("nuimo", "C3:81:DF:4E:FF:6A", &InputPrimitive::Rotate { delta: 0.05 })
+            .route(
+                "nuimo",
+                "C3:81:DF:4E:FF:6A",
+                &InputPrimitive::Rotate { delta: 0.05 },
+            )
             .await;
 
         assert_eq!(results.len(), 1);
@@ -186,7 +186,9 @@ mod tests {
             .route(
                 "nuimo",
                 "C3:81:DF:4E:FF:6A",
-                &InputPrimitive::Swipe { direction: Direction::Right },
+                &InputPrimitive::Swipe {
+                    direction: Direction::Right,
+                },
             )
             .await;
 
@@ -240,12 +242,26 @@ mod tests {
     async fn test_multiple_mappings_same_device() {
         let engine = RoutingEngine::new();
         let m1 = Mapping::new(
-            "nuimo", "C3:81:DF:4E:FF:6A", "roon", "zone-1",
-            vec![Route { input: InputType::Press, intent: IntentType::PlayPause, params: RouteParams::default() }],
+            "nuimo",
+            "C3:81:DF:4E:FF:6A",
+            "roon",
+            "zone-1",
+            vec![Route {
+                input: InputType::Press,
+                intent: IntentType::PlayPause,
+                params: RouteParams::default(),
+            }],
         );
         let m2 = Mapping::new(
-            "nuimo", "C3:81:DF:4E:FF:6A", "hue", "living-room",
-            vec![Route { input: InputType::Press, intent: IntentType::PowerToggle, params: RouteParams::default() }],
+            "nuimo",
+            "C3:81:DF:4E:FF:6A",
+            "hue",
+            "living-room",
+            vec![Route {
+                input: InputType::Press,
+                intent: IntentType::PowerToggle,
+                params: RouteParams::default(),
+            }],
         );
         engine.load_mappings(vec![m1, m2]).await;
 

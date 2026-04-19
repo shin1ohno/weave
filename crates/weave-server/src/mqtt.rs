@@ -56,10 +56,7 @@ impl MqttBridge {
         MqttBridge { client, event_loop }
     }
 
-    pub async fn start(
-        mut self,
-        engine: Arc<RoutingEngine>,
-    ) -> anyhow::Result<AsyncClient> {
+    pub async fn start(mut self, engine: Arc<RoutingEngine>) -> anyhow::Result<AsyncClient> {
         // Subscribe to all device input topics
         self.client
             .subscribe("device/+/+/input/#", QoS::AtLeastOnce)
@@ -178,7 +175,10 @@ async fn publish_intent(client: &AsyncClient, routed: &RoutedIntent) {
         intent_name(&routed.intent),
     );
     let payload = serde_json::to_string(&routed.intent).unwrap_or_default();
-    if let Err(e) = client.publish(&topic, QoS::AtMostOnce, false, payload).await {
+    if let Err(e) = client
+        .publish(&topic, QoS::AtMostOnce, false, payload)
+        .await
+    {
         tracing::warn!("Failed to publish intent: {}", e);
     }
 }

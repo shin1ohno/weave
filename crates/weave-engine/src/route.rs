@@ -33,26 +33,20 @@ impl Route {
 
         Some(match (&self.intent, input) {
             // Continuous value intents need the input's delta/value
-            (IntentType::VolumeChange, InputPrimitive::Rotate { delta }) => {
-                Intent::VolumeChange {
-                    delta: delta * self.params.damping,
-                }
-            }
-            (IntentType::VolumeChange, InputPrimitive::Slide { value }) => {
-                Intent::VolumeChange {
-                    delta: value * self.params.damping,
-                }
-            }
+            (IntentType::VolumeChange, InputPrimitive::Rotate { delta }) => Intent::VolumeChange {
+                delta: delta * self.params.damping,
+            },
+            (IntentType::VolumeChange, InputPrimitive::Slide { value }) => Intent::VolumeChange {
+                delta: value * self.params.damping,
+            },
             (IntentType::BrightnessChange, InputPrimitive::Rotate { delta }) => {
                 Intent::BrightnessChange {
                     delta: delta * self.params.damping,
                 }
             }
-            (IntentType::SeekRelative, InputPrimitive::Rotate { delta }) => {
-                Intent::SeekRelative {
-                    seconds: delta * self.params.damping,
-                }
-            }
+            (IntentType::SeekRelative, InputPrimitive::Rotate { delta }) => Intent::SeekRelative {
+                seconds: delta * self.params.damping,
+            },
             (IntentType::ColorTemperatureChange, InputPrimitive::Rotate { delta }) => {
                 Intent::ColorTemperatureChange {
                     delta: delta * self.params.damping,

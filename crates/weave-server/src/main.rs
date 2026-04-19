@@ -24,8 +24,8 @@ use crate::state_hub::StateHub;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let database_url = std::env::var("WEAVE_DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite://weave.db?mode=rwc".into());
+    let database_url =
+        std::env::var("WEAVE_DATABASE_URL").unwrap_or_else(|_| "sqlite://weave.db?mode=rwc".into());
     let mqtt_host = std::env::var("MQTT_HOST").unwrap_or_else(|_| "localhost".into());
     let mqtt_port: u16 = std::env::var("MQTT_PORT")
         .ok()

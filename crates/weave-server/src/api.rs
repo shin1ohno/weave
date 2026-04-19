@@ -6,9 +6,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
-use weave_contracts::{
-    Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame,
-};
+use weave_contracts::{Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame};
 use weave_engine::{Mapping, MappingStore};
 
 use crate::ctx::AppCtx;

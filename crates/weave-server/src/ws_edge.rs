@@ -98,14 +98,13 @@ async fn handle_edge_text(
             tracing::info!(%eid, %version, ?capabilities, "edge connected");
             *edge_id = Some(eid.clone());
             ctx.broker.register(eid.clone(), outbox_tx.clone());
-            ctx.hub
-                .mark_online(eid.clone(), version, capabilities);
+            ctx.hub.mark_online(eid.clone(), version, capabilities);
 
             let mappings = ctx.store.list_by_edge(&eid).await.unwrap_or_default();
             let contract_mappings: Vec<ContractMapping> = mappings
                 .iter()
-                .filter_map(|m| {
-                    match serde_json::to_value(m).and_then(serde_json::from_value) {
+                .filter_map(
+                    |m| match serde_json::to_value(m).and_then(serde_json::from_value) {
                         Ok(cm) => Some(cm),
                         Err(e) => {
                             tracing::warn!(
@@ -115,8 +114,8 @@ async fn handle_edge_text(
                             );
                             None
                         }
-                    }
-                })
+                    },
+                )
                 .collect();
 
             let glyph_set = ctx.store.list_glyphs().await.unwrap_or_default();
@@ -160,13 +159,8 @@ async fn handle_edge_text(
             value,
         } => {
             if let Some(eid) = edge_id.as_deref() {
-                ctx.hub.record_device_state(
-                    eid,
-                    &device_type,
-                    &device_id,
-                    &property,
-                    value,
-                );
+                ctx.hub
+                    .record_device_state(eid, &device_type, &device_id, &property, value);
             }
         }
         EdgeToServer::Pong => {

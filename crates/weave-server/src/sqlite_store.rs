@@ -132,43 +132,39 @@ impl MappingStore for SqliteStore {
                 .map_err(|e| StoreError::Internal(e.to_string()))?;
 
         row.map(|(json,)| {
-            serde_json::from_str::<Mapping>(&json)
-                .map_err(|e| StoreError::Internal(e.to_string()))
+            serde_json::from_str::<Mapping>(&json).map_err(|e| StoreError::Internal(e.to_string()))
         })
         .transpose()
     }
 
     async fn create_mapping(&self, mapping: &Mapping) -> Result<(), StoreError> {
-        let json = serde_json::to_string(mapping)
-            .map_err(|e| StoreError::Internal(e.to_string()))?;
+        let json =
+            serde_json::to_string(mapping).map_err(|e| StoreError::Internal(e.to_string()))?;
 
-        sqlx::query(
-            "INSERT INTO mappings (mapping_id, edge_id, mapping_json) VALUES (?, ?, ?)",
-        )
-        .bind(mapping.mapping_id.to_string())
-        .bind(&mapping.edge_id)
-        .bind(json)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        sqlx::query("INSERT INTO mappings (mapping_id, edge_id, mapping_json) VALUES (?, ?, ?)")
+            .bind(mapping.mapping_id.to_string())
+            .bind(&mapping.edge_id)
+            .bind(json)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
 
         Ok(())
     }
 
     async fn update_mapping(&self, mapping: &Mapping) -> Result<(), StoreError> {
-        let json = serde_json::to_string(mapping)
-            .map_err(|e| StoreError::Internal(e.to_string()))?;
+        let json =
+            serde_json::to_string(mapping).map_err(|e| StoreError::Internal(e.to_string()))?;
 
-        let rows = sqlx::query(
-            "UPDATE mappings SET edge_id = ?, mapping_json = ? WHERE mapping_id = ?",
-        )
-        .bind(&mapping.edge_id)
-        .bind(json)
-        .bind(mapping.mapping_id.to_string())
-        .execute(&self.pool)
-        .await
-        .map_err(|e| StoreError::Internal(e.to_string()))?
-        .rows_affected();
+        let rows =
+            sqlx::query("UPDATE mappings SET edge_id = ?, mapping_json = ? WHERE mapping_id = ?")
+                .bind(&mapping.edge_id)
+                .bind(json)
+                .bind(mapping.mapping_id.to_string())
+                .execute(&self.pool)
+                .await
+                .map_err(|e| StoreError::Internal(e.to_string()))?
+                .rows_affected();
 
         if rows == 0 {
             return Err(StoreError::NotFound(mapping.mapping_id.to_string()));
@@ -191,7 +187,7 @@ impl MappingStore for SqliteStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use weave_engine::{IntentType, InputType, Route, RouteParams};
+    use weave_engine::{InputType, IntentType, Route, RouteParams};
 
     async fn fresh_store() -> SqliteStore {
         SqliteStore::connect("sqlite::memory:").await.unwrap()
@@ -228,7 +224,12 @@ mod tests {
         updated.service_target = "zone-2".into();
         store.update_mapping(&updated).await.unwrap();
         assert_eq!(
-            store.get_mapping(&m.mapping_id).await.unwrap().unwrap().service_target,
+            store
+                .get_mapping(&m.mapping_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .service_target,
             "zone-2"
         );
 
@@ -238,8 +239,14 @@ mod tests {
     #[tokio::test]
     async fn list_by_edge_filters() {
         let store = fresh_store().await;
-        store.create_mapping(&sample_mapping("living-room")).await.unwrap();
-        store.create_mapping(&sample_mapping("bedroom")).await.unwrap();
+        store
+            .create_mapping(&sample_mapping("living-room"))
+            .await
+            .unwrap();
+        store
+            .create_mapping(&sample_mapping("bedroom"))
+            .await
+            .unwrap();
 
         let living = store.list_by_edge("living-room").await.unwrap();
         assert_eq!(living.len(), 1);

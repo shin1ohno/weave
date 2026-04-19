@@ -10,9 +10,7 @@ use std::sync::RwLock;
 
 use chrono::Utc;
 use tokio::sync::broadcast;
-use weave_contracts::{
-    DeviceStateEntry, EdgeInfo, ServiceStateEntry, UiFrame, UiSnapshot,
-};
+use weave_contracts::{DeviceStateEntry, EdgeInfo, ServiceStateEntry, UiFrame, UiSnapshot};
 
 const UI_CHANNEL_CAPACITY: usize = 256;
 
@@ -104,12 +102,7 @@ impl StateHub {
         }
     }
 
-    pub fn mark_online(
-        &self,
-        edge_id: String,
-        version: String,
-        capabilities: Vec<String>,
-    ) {
+    pub fn mark_online(&self, edge_id: String, version: String, capabilities: Vec<String>) {
         let info = EdgeInfo {
             edge_id: edge_id.clone(),
             online: true,

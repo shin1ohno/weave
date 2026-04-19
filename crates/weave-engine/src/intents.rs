@@ -13,25 +13,42 @@ pub enum Intent {
     Previous,
 
     // Volume
-    VolumeChange { delta: f64 },
-    VolumeSet { value: f64 },
+    VolumeChange {
+        delta: f64,
+    },
+    VolumeSet {
+        value: f64,
+    },
     Mute,
     Unmute,
 
     // Seek
-    SeekRelative { seconds: f64 },
-    SeekAbsolute { seconds: f64 },
+    SeekRelative {
+        seconds: f64,
+    },
+    SeekAbsolute {
+        seconds: f64,
+    },
 
     // Lighting
-    BrightnessChange { delta: f64 },
-    BrightnessSet { value: f64 },
-    ColorTemperatureChange { delta: f64 },
+    BrightnessChange {
+        delta: f64,
+    },
+    BrightnessSet {
+        value: f64,
+    },
+    ColorTemperatureChange {
+        delta: f64,
+    },
     PowerToggle,
     PowerOn,
     PowerOff,
 
     // Generic
-    Custom { name: String, value: serde_json::Value },
+    Custom {
+        name: String,
+        value: serde_json::Value,
+    },
 }
 
 /// The type of intent (without data), used in route configuration.

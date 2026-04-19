@@ -72,9 +72,9 @@ impl MappingStore for MemoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::intents::IntentType;
     use crate::mapping::Mapping;
     use crate::primitives::InputType;
-    use crate::intents::IntentType;
     use crate::route::{Route, RouteParams};
 
     fn test_mapping() -> Mapping {

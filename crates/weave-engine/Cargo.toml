@@ -1,7 +1,15 @@
 [package]
 name = "weave-engine"
-version = "0.1.0"
-edition = "2021"
+description = "Routing engine that maps IoT device primitives (rotate, press, swipe) to service intents (play, volume, brightness)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["iot", "routing", "weave", "mapping"]
+categories = ["api-bindings"]
 
 [dependencies]
 async-trait = "0.1"

@@ -1,15 +1,23 @@
 [package]
 name = "weave-server"
-version = "0.1.0"
-edition = "2021"
+description = "HTTP/WebSocket/MQTT control plane for weave — persists mappings, pushes config to edge-agents, bridges MQTT devices to service adapters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["iot", "routing", "weave", "mqtt", "websocket"]
+categories = ["network-programming", "web-programming::http-server"]
 
 [dependencies]
 anyhow = "1"
 axum = { version = "0.7", features = ["ws"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 uuid = { workspace = true }
-weave-engine = { path = "../weave-engine" }
-weave-contracts = { path = "../../../edge-agent/crates/weave-contracts" }
+weave-engine = { version = "0.1", path = "../weave-engine" }
+weave-contracts = { version = "0.1", path = "../../../edge-agent/crates/weave-contracts" }
 rumqttc = "0.24"
 serde = { workspace = true }
 serde_json = { workspace = true }
