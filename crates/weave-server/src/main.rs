@@ -50,28 +50,46 @@ async fn main() -> anyhow::Result<()> {
     let hub = Arc::new(StateHub::new());
     let broker = Arc::new(PushBroker::new());
 
+    // MQTT path remains available as the N:N cross-host alternative. Disabled
+    // entirely if WEAVE_DISABLE_MQTT is set; otherwise we try to connect and
+    // keep serving REST + WS regardless of broker availability. When
+    // connected, also hydrate `system/glyphs/{name}` so MQTT consumers
+    // (nuimo-mqtt etc.) see the current glyph set.
+    let mqtt_client = if disable_mqtt {
+        tracing::info!("MQTT bridge disabled via WEAVE_DISABLE_MQTT");
+        None
+    } else {
+        let mqtt_bridge = mqtt::MqttBridge::new(&mqtt_host, mqtt_port);
+        match mqtt_bridge.start(engine.clone()).await {
+            Ok(client) => {
+                tracing::info!(%mqtt_host, mqtt_port, "MQTT bridge started");
+                let glyph_set = store.list_glyphs().await.unwrap_or_default();
+                for g in &glyph_set {
+                    mqtt::publish_glyph(&client, g).await;
+                }
+                tracing::info!(
+                    count = glyph_set.len(),
+                    "published glyphs to system/glyphs/*"
+                );
+                Some(client)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "MQTT bridge failed to start; continuing without it"
+                );
+                None
+            }
+        }
+    };
+
     let ctx = AppCtx {
         engine: engine.clone(),
         store: store.clone(),
         hub: hub.clone(),
         broker: broker.clone(),
+        mqtt: mqtt_client,
     };
-
-    // MQTT path remains available as the N:N cross-host alternative. Disabled
-    // entirely if WEAVE_DISABLE_MQTT is set; otherwise we try to connect and
-    // keep serving REST + WS regardless of broker availability.
-    if !disable_mqtt {
-        let mqtt_bridge = mqtt::MqttBridge::new(&mqtt_host, mqtt_port);
-        match mqtt_bridge.start(engine.clone()).await {
-            Ok(_) => tracing::info!(%mqtt_host, mqtt_port, "MQTT bridge started"),
-            Err(e) => tracing::warn!(
-                error = %e,
-                "MQTT bridge failed to start; continuing without it"
-            ),
-        }
-    } else {
-        tracing::info!("MQTT bridge disabled via WEAVE_DISABLE_MQTT");
-    }
 
     let app: Router = Router::new()
         .merge(api::router())

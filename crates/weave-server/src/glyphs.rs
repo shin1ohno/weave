@@ -156,6 +156,10 @@ async fn put_glyph(
         .upsert_glyph(&glyph)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if let Some(client) = ctx.mqtt.as_ref() {
+        crate::mqtt::publish_glyph(client, &glyph).await;
+    }
     push_glyph_change(&ctx).await;
     Ok(Json(glyph))
 }
@@ -163,6 +167,9 @@ async fn put_glyph(
 async fn delete_glyph(State(ctx): State<AppCtx>, Path(name): Path<String>) -> StatusCode {
     match ctx.store.delete_glyph(&name).await {
         Ok(true) => {
+            if let Some(client) = ctx.mqtt.as_ref() {
+                crate::mqtt::publish_glyph_delete(client, &name).await;
+            }
             push_glyph_change(&ctx).await;
             StatusCode::NO_CONTENT
         }

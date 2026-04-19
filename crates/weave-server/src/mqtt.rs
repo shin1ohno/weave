@@ -2,7 +2,37 @@ use std::sync::Arc;
 
 use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
 
+use weave_contracts::Glyph;
 use weave_engine::{InputPrimitive, RoutedIntent, RoutingEngine};
+
+/// Publish a glyph as a retained message at `system/glyphs/{name}`. MQTT
+/// consumers (nuimo-mqtt etc.) subscribe to `system/glyphs/+` to hydrate
+/// their local registry.
+pub async fn publish_glyph(client: &AsyncClient, glyph: &Glyph) {
+    let topic = format!("system/glyphs/{}", glyph.name);
+    match serde_json::to_vec(glyph) {
+        Ok(payload) => {
+            if let Err(e) = client
+                .publish(&topic, QoS::AtLeastOnce, true, payload)
+                .await
+            {
+                tracing::warn!(%topic, error = %e, "failed to publish glyph");
+            }
+        }
+        Err(e) => tracing::warn!(error = %e, "failed to serialize glyph"),
+    }
+}
+
+/// Publish an empty retained message to drop the glyph from subscribers.
+pub async fn publish_glyph_delete(client: &AsyncClient, name: &str) {
+    let topic = format!("system/glyphs/{}", name);
+    if let Err(e) = client
+        .publish(&topic, QoS::AtLeastOnce, true, Vec::new())
+        .await
+    {
+        tracing::warn!(%topic, error = %e, "failed to tombstone glyph");
+    }
+}
 
 /// Incoming device event parsed from MQTT.
 #[derive(Debug)]
