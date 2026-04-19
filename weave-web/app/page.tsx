@@ -3,6 +3,7 @@
 import { useUIState } from "@/lib/ws";
 import { EdgeCard } from "@/components/EdgeCard";
 import { ZoneCard } from "@/components/ZoneCard";
+import { LightCard } from "@/components/LightCard";
 
 export default function Overview() {
   const state = useUIState();
@@ -14,6 +15,10 @@ export default function Overview() {
     list.push(s);
     roonTargets.set(s.target, list);
   }
+
+  const hueLights = state.serviceStates
+    .filter((s) => s.service_type === "hue" && s.property === "light")
+    .sort((a, b) => a.target.localeCompare(b.target));
 
   return (
     <div className="space-y-10">
@@ -70,6 +75,26 @@ export default function Overview() {
               .map(([target, states]) => (
                 <ZoneCard key={target} target={target} states={states} />
               ))}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-3 text-lg font-semibold">Hue lights</h3>
+        {hueLights.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            No Hue state yet. An edge-agent with the `hue` adapter (pair it
+            via `edge-agent pair-hue`) needs to be connected.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {hueLights.map((entry) => (
+              <LightCard
+                key={entry.target}
+                target={entry.target}
+                entry={entry}
+              />
+            ))}
           </div>
         )}
       </section>

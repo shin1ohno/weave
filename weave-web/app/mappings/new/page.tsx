@@ -73,21 +73,20 @@ export default function NewMapping() {
         .sort(),
     [state.deviceStates, deviceType]
   );
-  const knownTargets = useMemo(
-    () =>
-      state.serviceStates
-        .filter((s) => s.service_type === serviceType && s.property === "zone")
-        .map((s) => ({
-          target: s.target,
-          label:
-            (s.value as { display_name?: string } | undefined)?.display_name ??
-            s.target,
-        }))
-        .filter(
-          (v, i, a) => a.findIndex((x) => x.target === v.target) === i
-        ),
-    [state.serviceStates, serviceType]
-  );
+  const knownTargets = useMemo(() => {
+    const metaProperty = serviceType === "hue" ? "light" : "zone";
+    return state.serviceStates
+      .filter(
+        (s) => s.service_type === serviceType && s.property === metaProperty
+      )
+      .map((s) => ({
+        target: s.target,
+        label:
+          (s.value as { display_name?: string } | undefined)?.display_name ??
+          s.target,
+      }))
+      .filter((v, i, a) => a.findIndex((x) => x.target === v.target) === i);
+  }, [state.serviceStates, serviceType]);
 
   const addRoute = () =>
     setRoutes([...routes, { input: "press", intent: "play" }]);

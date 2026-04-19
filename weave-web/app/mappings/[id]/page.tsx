@@ -71,26 +71,22 @@ export default function EditMapping() {
     getMapping(id).then(setMapping).catch((e) => setError(e.message));
   }, [id, fromLive]);
 
-  const knownTargets = useMemo(
-    () =>
-      state.serviceStates
-        .filter(
-          (s) =>
-            mapping &&
-            s.service_type === mapping.service_type &&
-            s.property === "zone"
-        )
-        .map((s) => ({
-          target: s.target,
-          label:
-            (s.value as { display_name?: string } | undefined)?.display_name ??
-            s.target,
-        }))
-        .filter(
-          (v, i, a) => a.findIndex((x) => x.target === v.target) === i
-        ),
-    [state.serviceStates, mapping]
-  );
+  const knownTargets = useMemo(() => {
+    if (!mapping) return [];
+    const metaProperty = mapping.service_type === "hue" ? "light" : "zone";
+    return state.serviceStates
+      .filter(
+        (s) =>
+          s.service_type === mapping.service_type && s.property === metaProperty
+      )
+      .map((s) => ({
+        target: s.target,
+        label:
+          (s.value as { display_name?: string } | undefined)?.display_name ??
+          s.target,
+      }))
+      .filter((v, i, a) => a.findIndex((x) => x.target === v.target) === i);
+  }, [state.serviceStates, mapping]);
 
   if (error) return <div className="text-red-600">{error}</div>;
   if (!mapping) return <div>Loading…</div>;
