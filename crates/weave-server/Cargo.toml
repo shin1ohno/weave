@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1"
 axum = { version = "0.7", features = ["ws"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 uuid = { workspace = true }
 weave-engine = { path = "../weave-engine" }
 weave-contracts = { path = "../../../edge-agent/crates/weave-contracts" }

@@ -1,41 +1,49 @@
-use std::sync::Arc;
+//! REST API for mapping CRUD. Every mutation also pushes the appropriate
+//! `ServerToEdge` frame to the affected edge via `push_broker` and a
+//! `UiFrame::MappingChanged` to `/ws/ui` subscribers via `state_hub`.
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
+use weave_contracts::{
+    Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame,
+};
+use weave_engine::{Mapping, MappingStore};
 
-use weave_engine::{Mapping, MappingStore, RoutingEngine};
+use crate::ctx::AppCtx;
 
-pub struct AppState<S: MappingStore> {
-    pub engine: Arc<RoutingEngine>,
-    pub store: Arc<S>,
-}
-
-pub fn router<S: MappingStore>(state: Arc<AppState<S>>) -> Router {
+pub fn router() -> Router<AppCtx> {
     Router::new()
-        .route("/api/mappings", get(list_mappings::<S>))
-        .route("/api/mappings", post(create_mapping::<S>))
-        .route("/api/mappings/{id}", get(get_mapping::<S>))
-        .route("/api/mappings/{id}", put(update_mapping::<S>))
-        .route("/api/mappings/{id}", delete(delete_mapping::<S>))
-        .route("/api/mappings/{id}/target", post(switch_target::<S>))
-        .with_state(state)
+        .route("/api/mappings", get(list_mappings))
+        .route("/api/mappings", post(create_mapping))
+        .route("/api/mappings/{id}", get(get_mapping))
+        .route("/api/mappings/{id}", put(update_mapping))
+        .route("/api/mappings/{id}", delete(delete_mapping))
+        .route("/api/mappings/{id}/target", post(switch_target))
 }
 
-async fn list_mappings<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
-) -> Result<Json<Vec<Mapping>>, StatusCode> {
-    let mappings = state.store.list_mappings().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+fn to_contract(m: &Mapping) -> Option<ContractMapping> {
+    serde_json::to_value(m)
+        .and_then(serde_json::from_value)
+        .ok()
+}
+
+async fn list_mappings(State(ctx): State<AppCtx>) -> Result<Json<Vec<Mapping>>, StatusCode> {
+    let mappings = ctx
+        .store
+        .list_mappings()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok(Json(mappings))
 }
 
-async fn get_mapping<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
+async fn get_mapping(
+    State(ctx): State<AppCtx>,
     Path(id): Path<String>,
 ) -> Result<Json<Mapping>, StatusCode> {
     let uuid: uuid::Uuid = id.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
-    let mapping = state
+    let mapping = ctx
         .store
         .get_mapping(&uuid)
         .await
@@ -44,49 +52,58 @@ async fn get_mapping<S: MappingStore>(
     Ok(Json(mapping))
 }
 
-async fn create_mapping<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
+async fn create_mapping(
+    State(ctx): State<AppCtx>,
     Json(mapping): Json<Mapping>,
 ) -> Result<(StatusCode, Json<Mapping>), StatusCode> {
-    state
-        .store
+    ctx.store
         .create_mapping(&mapping)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    state.engine.upsert_mapping(mapping.clone()).await;
+    ctx.engine.upsert_mapping(mapping.clone()).await;
+    push_mapping_upsert(&ctx, &mapping);
     Ok((StatusCode::CREATED, Json(mapping)))
 }
 
-async fn update_mapping<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
+async fn update_mapping(
+    State(ctx): State<AppCtx>,
     Path(id): Path<String>,
     Json(mut mapping): Json<Mapping>,
 ) -> Result<Json<Mapping>, StatusCode> {
     let uuid: uuid::Uuid = id.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
     mapping.mapping_id = uuid;
-    state
-        .store
+    ctx.store
         .update_mapping(&mapping)
         .await
         .map_err(|e| match e {
             weave_engine::StoreError::NotFound(_) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         })?;
-    state.engine.upsert_mapping(mapping.clone()).await;
+    ctx.engine.upsert_mapping(mapping.clone()).await;
+    push_mapping_upsert(&ctx, &mapping);
     Ok(Json(mapping))
 }
 
-async fn delete_mapping<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
-    Path(id): Path<String>,
-) -> StatusCode {
+async fn delete_mapping(State(ctx): State<AppCtx>, Path(id): Path<String>) -> StatusCode {
     let uuid: uuid::Uuid = match id.parse() {
         Ok(u) => u,
         Err(_) => return StatusCode::BAD_REQUEST,
     };
-    match state.store.delete_mapping(&uuid).await {
+
+    let existing = ctx.store.get_mapping(&uuid).await.ok().flatten();
+
+    match ctx.store.delete_mapping(&uuid).await {
         Ok(true) => {
-            state.engine.remove_mapping(uuid).await;
+            ctx.engine.remove_mapping(uuid).await;
+            if let Some(m) = existing {
+                push_mapping_delete(&ctx, &m);
+            } else {
+                ctx.hub.broadcast(UiFrame::MappingChanged {
+                    mapping_id: uuid,
+                    op: PatchOp::Delete,
+                    mapping: None,
+                });
+            }
             StatusCode::NO_CONTENT
         }
         Ok(false) => StatusCode::NOT_FOUND,
@@ -99,8 +116,8 @@ struct SwitchTargetRequest {
     service_target: String,
 }
 
-async fn switch_target<S: MappingStore>(
-    State(state): State<Arc<AppState<S>>>,
+async fn switch_target(
+    State(ctx): State<AppCtx>,
     Path(id): Path<String>,
     Json(body): Json<SwitchTargetRequest>,
 ) -> StatusCode {
@@ -108,14 +125,56 @@ async fn switch_target<S: MappingStore>(
         Ok(u) => u,
         Err(_) => return StatusCode::BAD_REQUEST,
     };
-    if state.engine.switch_target(uuid, &body.service_target).await {
-        // Also update store
-        if let Ok(Some(mut mapping)) = state.store.get_mapping(&uuid).await {
-            mapping.service_target = body.service_target;
-            let _ = state.store.update_mapping(&mapping).await;
+    if ctx.engine.switch_target(uuid, &body.service_target).await {
+        if let Ok(Some(mut mapping)) = ctx.store.get_mapping(&uuid).await {
+            mapping.service_target = body.service_target.clone();
+            let _ = ctx.store.update_mapping(&mapping).await;
+            push_mapping_upsert(&ctx, &mapping);
         }
         StatusCode::OK
     } else {
         StatusCode::NOT_FOUND
     }
+}
+
+fn push_mapping_upsert(ctx: &AppCtx, mapping: &Mapping) {
+    let Some(contract) = to_contract(mapping) else {
+        return;
+    };
+    // Push to the owning edge so it updates its routing engine immediately.
+    if !contract.edge_id.is_empty() {
+        ctx.broker.send_to_edge(
+            &contract.edge_id,
+            ServerToEdge::ConfigPatch {
+                mapping_id: contract.mapping_id,
+                op: PatchOp::Upsert,
+                mapping: Some(contract.clone()),
+            },
+        );
+    }
+    // Fan out to every connected Web UI.
+    ctx.hub.broadcast(UiFrame::MappingChanged {
+        mapping_id: contract.mapping_id,
+        op: PatchOp::Upsert,
+        mapping: Some(contract),
+    });
+}
+
+fn push_mapping_delete(ctx: &AppCtx, mapping: &Mapping) {
+    let mapping_id = mapping.mapping_id;
+    if !mapping.edge_id.is_empty() {
+        ctx.broker.send_to_edge(
+            &mapping.edge_id,
+            ServerToEdge::ConfigPatch {
+                mapping_id,
+                op: PatchOp::Delete,
+                mapping: None,
+            },
+        );
+    }
+    ctx.hub.broadcast(UiFrame::MappingChanged {
+        mapping_id,
+        op: PatchOp::Delete,
+        mapping: None,
+    });
 }

@@ -1,8 +1,12 @@
 mod api;
+mod ctx;
 mod glyphs;
 mod mqtt;
+mod push_broker;
 mod sqlite_store;
+mod state_hub;
 mod ws_edge;
+mod ws_ui;
 
 use std::sync::Arc;
 
@@ -11,7 +15,10 @@ use axum::Router;
 use tower_http::cors::CorsLayer;
 use weave_engine::{MappingStore, RoutingEngine};
 
+use crate::ctx::AppCtx;
+use crate::push_broker::PushBroker;
 use crate::sqlite_store::SqliteStore;
+use crate::state_hub::StateHub;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,6 +35,9 @@ async fn main() -> anyhow::Result<()> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(3001);
+    let disable_mqtt = std::env::var("WEAVE_DISABLE_MQTT")
+        .map(|v| !matches!(v.as_str(), "" | "0" | "false" | "no"))
+        .unwrap_or(false);
 
     let store = Arc::new(SqliteStore::connect(&database_url).await?);
     tracing::info!(database_url = %database_url, "sqlite store ready");
@@ -37,31 +47,38 @@ async fn main() -> anyhow::Result<()> {
     let mappings = store.list_mappings().await?;
     engine.load_mappings(mappings).await;
 
-    // MQTT bridge is kept for Phase 1 back-compat but is non-fatal: if the
-    // broker is unreachable, log and continue so weave-server can still serve
-    // REST + WS clients. Removed in Phase 4.
-    let mqtt_bridge = mqtt::MqttBridge::new(&mqtt_host, mqtt_port);
-    match mqtt_bridge.start(engine.clone()).await {
-        Ok(_) => tracing::info!(%mqtt_host, mqtt_port, "MQTT bridge started"),
-        Err(e) => tracing::warn!(
-            error = %e,
-            "MQTT bridge failed to start; continuing without it (Phase 4 removes MQTT entirely)"
-        ),
-    }
+    let hub = Arc::new(StateHub::new());
+    let broker = Arc::new(PushBroker::new());
 
-    let app_state = Arc::new(api::AppState {
+    let ctx = AppCtx {
         engine: engine.clone(),
         store: store.clone(),
-    });
-    let api_router = api::router(app_state);
-    let glyph_router = glyphs::router(store.clone());
-    let ws_router = Router::new()
-        .route("/ws/edge", get(ws_edge::handler))
-        .with_state(store);
+        hub: hub.clone(),
+        broker: broker.clone(),
+    };
 
-    let app = api_router
-        .merge(glyph_router)
-        .merge(ws_router)
+    // MQTT path remains available as the N:N cross-host alternative. Disabled
+    // entirely if WEAVE_DISABLE_MQTT is set; otherwise we try to connect and
+    // keep serving REST + WS regardless of broker availability.
+    if !disable_mqtt {
+        let mqtt_bridge = mqtt::MqttBridge::new(&mqtt_host, mqtt_port);
+        match mqtt_bridge.start(engine.clone()).await {
+            Ok(_) => tracing::info!(%mqtt_host, mqtt_port, "MQTT bridge started"),
+            Err(e) => tracing::warn!(
+                error = %e,
+                "MQTT bridge failed to start; continuing without it"
+            ),
+        }
+    } else {
+        tracing::info!("MQTT bridge disabled via WEAVE_DISABLE_MQTT");
+    }
+
+    let app: Router = Router::new()
+        .merge(api::router())
+        .merge(glyphs::router())
+        .route("/ws/edge", get(ws_edge::handler))
+        .route("/ws/ui", get(ws_ui::handler))
+        .with_state(ctx)
         .layer(CorsLayer::permissive());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", api_port)).await?;

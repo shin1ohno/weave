@@ -5,14 +5,13 @@
 //! Parametric glyphs (e.g. `volume_bar`) are registered with `builtin = true`
 //! and an empty pattern — consumers render them programmatically.
 
-use std::sync::Arc;
-
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, put};
 use axum::{Json, Router};
-use weave_contracts::Glyph;
+use weave_contracts::{Glyph, ServerToEdge, UiFrame};
 
+use crate::ctx::AppCtx;
 use crate::sqlite_store::SqliteStore;
 
 /// Seed the default glyph set when the table is empty. Safe to call on every
@@ -119,19 +118,16 @@ fn default_set() -> Vec<Glyph> {
     ]
 }
 
-pub fn router(store: Arc<SqliteStore>) -> Router {
+pub fn router() -> Router<AppCtx> {
     Router::new()
         .route("/api/glyphs", get(list_glyphs))
         .route("/api/glyphs/{name}", get(get_glyph))
         .route("/api/glyphs/{name}", put(put_glyph))
         .route("/api/glyphs/{name}", delete(delete_glyph))
-        .with_state(store)
 }
 
-async fn list_glyphs(
-    State(store): State<Arc<SqliteStore>>,
-) -> Result<Json<Vec<Glyph>>, StatusCode> {
-    store
+async fn list_glyphs(State(ctx): State<AppCtx>) -> Result<Json<Vec<Glyph>>, StatusCode> {
+    ctx.store
         .list_glyphs()
         .await
         .map(Json)
@@ -139,10 +135,10 @@ async fn list_glyphs(
 }
 
 async fn get_glyph(
-    State(store): State<Arc<SqliteStore>>,
+    State(ctx): State<AppCtx>,
     Path(name): Path<String>,
 ) -> Result<Json<Glyph>, StatusCode> {
-    store
+    ctx.store
         .get_glyph(&name)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -151,25 +147,34 @@ async fn get_glyph(
 }
 
 async fn put_glyph(
-    State(store): State<Arc<SqliteStore>>,
+    State(ctx): State<AppCtx>,
     Path(name): Path<String>,
     Json(mut glyph): Json<Glyph>,
 ) -> Result<Json<Glyph>, StatusCode> {
     glyph.name = name;
-    store
+    ctx.store
         .upsert_glyph(&glyph)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    push_glyph_change(&ctx).await;
     Ok(Json(glyph))
 }
 
-async fn delete_glyph(
-    State(store): State<Arc<SqliteStore>>,
-    Path(name): Path<String>,
-) -> StatusCode {
-    match store.delete_glyph(&name).await {
-        Ok(true) => StatusCode::NO_CONTENT,
+async fn delete_glyph(State(ctx): State<AppCtx>, Path(name): Path<String>) -> StatusCode {
+    match ctx.store.delete_glyph(&name).await {
+        Ok(true) => {
+            push_glyph_change(&ctx).await;
+            StatusCode::NO_CONTENT
+        }
         Ok(false) => StatusCode::NOT_FOUND,
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
+}
+
+async fn push_glyph_change(ctx: &AppCtx) {
+    let glyphs = ctx.store.list_glyphs().await.unwrap_or_default();
+    ctx.broker.broadcast(ServerToEdge::GlyphsUpdate {
+        glyphs: glyphs.clone(),
+    });
+    ctx.hub.broadcast(UiFrame::GlyphsChanged { glyphs });
 }
