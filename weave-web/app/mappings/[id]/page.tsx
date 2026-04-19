@@ -1,105 +1,315 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getMapping, updateMapping, switchTarget, type Mapping } from "@/lib/api";
+import {
+  getMapping,
+  updateMapping,
+  type Mapping,
+  type Route,
+} from "@/lib/api";
+import { useUIState, useUIDispatch } from "@/lib/ws";
+
+const INPUT_TYPES = [
+  "rotate",
+  "press",
+  "release",
+  "long_press",
+  "swipe_up",
+  "swipe_down",
+  "swipe_left",
+  "swipe_right",
+  "slide",
+  "hover",
+  "touch_top",
+  "touch_bottom",
+  "touch_left",
+  "touch_right",
+  "key_press",
+];
+
+const INTENT_TYPES = [
+  "play",
+  "pause",
+  "play_pause",
+  "stop",
+  "next",
+  "previous",
+  "volume_change",
+  "volume_set",
+  "mute",
+  "unmute",
+  "seek_relative",
+  "seek_absolute",
+  "brightness_change",
+  "brightness_set",
+  "power_toggle",
+  "power_on",
+  "power_off",
+];
 
 export default function EditMapping() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const [mapping, setMapping] = useState<Mapping | null>(null);
-  const [newTarget, setNewTarget] = useState("");
+  const state = useUIState();
+  const dispatch = useUIDispatch();
+
+  const fromLive = useMemo(
+    () => state.mappings.find((m) => m.mapping_id === id) ?? null,
+    [state.mappings, id]
+  );
+  const [mapping, setMapping] = useState<Mapping | null>(fromLive);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getMapping(id).then(setMapping).catch(console.error);
-  }, [id]);
+    if (fromLive) {
+      setMapping(fromLive);
+      return;
+    }
+    getMapping(id).then(setMapping).catch((e) => setError(e.message));
+  }, [id, fromLive]);
 
-  if (!mapping) return <div className="p-8 dark:text-white">Loading...</div>;
+  const knownTargets = useMemo(
+    () =>
+      state.serviceStates
+        .filter(
+          (s) =>
+            mapping &&
+            s.service_type === mapping.service_type &&
+            s.property === "zone"
+        )
+        .map((s) => ({
+          target: s.target,
+          label:
+            (s.value as { display_name?: string } | undefined)?.display_name ??
+            s.target,
+        }))
+        .filter(
+          (v, i, a) => a.findIndex((x) => x.target === v.target) === i
+        ),
+    [state.serviceStates, mapping]
+  );
 
-  const handleSave = async () => {
-    await updateMapping(id, mapping);
-    router.push("/");
+  if (error) return <div className="text-red-600">{error}</div>;
+  if (!mapping) return <div>Loading…</div>;
+
+  const updateField = <K extends keyof Mapping>(key: K, value: Mapping[K]) => {
+    setMapping({ ...mapping, [key]: value });
   };
 
-  const handleSwitchTarget = async () => {
-    if (!newTarget) return;
-    await switchTarget(id, newTarget);
-    setMapping({ ...mapping, service_target: newTarget });
-    setNewTarget("");
+  const updateRoute = (i: number, next: Route) => {
+    const routes = [...mapping.routes];
+    routes[i] = next;
+    setMapping({ ...mapping, routes });
+  };
+  const removeRoute = (i: number) => {
+    setMapping({
+      ...mapping,
+      routes: mapping.routes.filter((_, idx) => idx !== i),
+    });
+  };
+  const addRoute = () => {
+    setMapping({
+      ...mapping,
+      routes: [...mapping.routes, { input: "press", intent: "play" }],
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    dispatch({ kind: "local_upsert_mapping", mapping });
+    try {
+      await updateMapping(id, mapping);
+      router.push("/mappings");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6 dark:text-white">Edit Mapping</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Edit mapping</h2>
+        <button
+          onClick={() => router.push("/mappings")}
+          className="text-sm text-zinc-500 hover:underline"
+        >
+          ← Back
+        </button>
+      </div>
 
-        <div className="bg-white dark:bg-zinc-800 rounded-lg p-6 shadow-sm border dark:border-zinc-700 mb-6">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <span className="text-sm text-zinc-500">Device</span>
-              <p className="font-medium dark:text-white">{mapping.device_type}/{mapping.device_id}</p>
-            </div>
-            <div>
-              <span className="text-sm text-zinc-500">Service</span>
-              <p className="font-medium dark:text-white">{mapping.service_type}/{mapping.service_target}</p>
-            </div>
-          </div>
-
-          <div className="border-t dark:border-zinc-700 pt-4">
-            <h3 className="text-sm font-medium mb-2 dark:text-zinc-300">Switch Target</h3>
-            <div className="flex gap-2">
-              <input
-                value={newTarget}
-                onChange={(e) => setNewTarget(e.target.value)}
-                placeholder="New service target ID..."
-                className="flex-1 border rounded-lg px-3 py-2 text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white"
-              />
-              <button
-                onClick={handleSwitchTarget}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-              >
-                Switch
-              </button>
-            </div>
-          </div>
+      {error && (
+        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700">
+          {error}
         </div>
+      )}
 
-        <div className="bg-white dark:bg-zinc-800 rounded-lg p-6 shadow-sm border dark:border-zinc-700 mb-6">
-          <h3 className="font-medium mb-3 dark:text-white">Routes</h3>
-          <div className="space-y-2">
-            {mapping.routes.map((route, i) => (
-              <div key={i} className="flex gap-2 items-center text-sm dark:text-zinc-300">
-                <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">{route.input}</span>
-                <span className="text-zinc-400">→</span>
-                <span className="bg-zinc-100 dark:bg-zinc-700 px-2 py-1 rounded">{route.intent}</span>
-                {route.params?.damping && route.params.damping !== 1 && (
-                  <span className="text-zinc-400">(damping: {route.params.damping})</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <label className="flex items-center gap-2 dark:text-white">
+      <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Edge ID">
             <input
-              type="checkbox"
-              checked={mapping.active}
-              onChange={(e) => setMapping({ ...mapping, active: e.target.checked })}
+              value={mapping.edge_id}
+              onChange={(e) => updateField("edge_id", e.target.value)}
+              list="edge-ids"
+              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
-            Active
-          </label>
-          <button onClick={handleSave}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-            Save
-          </button>
-          <button onClick={() => router.push("/")}
-            className="border px-6 py-2 rounded-lg hover:bg-zinc-100 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800">
-            Back
-          </button>
+            <datalist id="edge-ids">
+              {state.edges.map((e) => (
+                <option key={e.edge_id} value={e.edge_id} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Active">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={mapping.active}
+                onChange={(e) => updateField("active", e.target.checked)}
+              />
+              {mapping.active ? "active" : "inactive"}
+            </label>
+          </Field>
+          <Field label="Device Type">
+            <input
+              value={mapping.device_type}
+              onChange={(e) => updateField("device_type", e.target.value)}
+              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </Field>
+          <Field label="Device ID">
+            <input
+              value={mapping.device_id}
+              onChange={(e) => updateField("device_id", e.target.value)}
+              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </Field>
+          <Field label="Service Type">
+            <input
+              value={mapping.service_type}
+              onChange={(e) => updateField("service_type", e.target.value)}
+              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </Field>
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Service Target
+            </label>
+            {knownTargets.length > 0 && (
+              <select
+                value={mapping.service_target}
+                onChange={(e) =>
+                  updateField("service_target", e.target.value)
+                }
+                className="mb-2 w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="">— pick —</option>
+                {knownTargets.map((t) => (
+                  <option key={t.target} value={t.target}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              value={mapping.service_target}
+              onChange={(e) => updateField("service_target", e.target.value)}
+              className="w-full rounded border bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </div>
         </div>
       </div>
+
+      <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div className="flex items-center justify-between">
+          <h3 className="font-medium">Routes</h3>
+          <button
+            type="button"
+            onClick={addRoute}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            + Add route
+          </button>
+        </div>
+        {mapping.routes.map((route, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <select
+              value={route.input}
+              onChange={(e) =>
+                updateRoute(i, { ...route, input: e.target.value })
+              }
+              className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              {INPUT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <span className="text-zinc-400">→</span>
+            <select
+              value={route.intent}
+              onChange={(e) =>
+                updateRoute(i, { ...route, intent: e.target.value })
+              }
+              className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              {INTENT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={route.params?.damping ?? 1}
+              onChange={(e) =>
+                updateRoute(i, {
+                  ...route,
+                  params: { damping: Number(e.target.value) },
+                })
+              }
+              className="w-20 rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button
+              type="button"
+              onClick={() => removeRoute(i)}
+              className="text-sm text-red-500 hover:underline"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium">{label}</label>
+      {children}
     </div>
   );
 }

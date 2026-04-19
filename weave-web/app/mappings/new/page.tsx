@@ -1,46 +1,98 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createMapping, type Route } from "@/lib/api";
+import { useUIState } from "@/lib/ws";
 
 const INPUT_TYPES = [
-  "rotate", "press", "release", "long_press",
-  "swipe_up", "swipe_down", "swipe_left", "swipe_right",
-  "slide", "hover",
-  "touch_top", "touch_bottom", "touch_left", "touch_right",
+  "rotate",
+  "press",
+  "release",
+  "long_press",
+  "swipe_up",
+  "swipe_down",
+  "swipe_left",
+  "swipe_right",
+  "slide",
+  "hover",
+  "touch_top",
+  "touch_bottom",
+  "touch_left",
+  "touch_right",
   "key_press",
 ];
 
 const INTENT_TYPES = [
-  "play", "pause", "playpause", "stop", "next", "previous",
-  "volume_change", "volume_set", "mute", "unmute",
-  "seek_relative", "seek_absolute",
-  "brightness_change", "brightness_set",
-  "power_toggle", "power_on", "power_off",
+  "play",
+  "pause",
+  "play_pause",
+  "stop",
+  "next",
+  "previous",
+  "volume_change",
+  "volume_set",
+  "mute",
+  "unmute",
+  "seek_relative",
+  "seek_absolute",
+  "brightness_change",
+  "brightness_set",
+  "power_toggle",
+  "power_on",
+  "power_off",
 ];
 
 export default function NewMapping() {
   const router = useRouter();
+  const state = useUIState();
+  const [edgeId, setEdgeId] = useState("");
   const [deviceType, setDeviceType] = useState("nuimo");
   const [deviceId, setDeviceId] = useState("");
   const [serviceType, setServiceType] = useState("roon");
   const [serviceTarget, setServiceTarget] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [routes, setRoutes] = useState<Route[]>([
     { input: "rotate", intent: "volume_change", params: { damping: 80 } },
-    { input: "press", intent: "playpause" },
+    { input: "press", intent: "play_pause" },
     { input: "swipe_right", intent: "next" },
     { input: "swipe_left", intent: "previous" },
   ]);
 
-  const addRoute = () => {
+  const knownEdges = useMemo(
+    () => state.edges.map((e) => e.edge_id).sort(),
+    [state.edges]
+  );
+  const knownDevices = useMemo(
+    () =>
+      state.deviceStates
+        .filter((d) => d.device_type === deviceType)
+        .map((d) => d.device_id)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort(),
+    [state.deviceStates, deviceType]
+  );
+  const knownTargets = useMemo(
+    () =>
+      state.serviceStates
+        .filter((s) => s.service_type === serviceType && s.property === "zone")
+        .map((s) => ({
+          target: s.target,
+          label:
+            (s.value as { display_name?: string } | undefined)?.display_name ??
+            s.target,
+        }))
+        .filter(
+          (v, i, a) => a.findIndex((x) => x.target === v.target) === i
+        ),
+    [state.serviceStates, serviceType]
+  );
+
+  const addRoute = () =>
     setRoutes([...routes, { input: "press", intent: "play" }]);
-  };
-
-  const removeRoute = (i: number) => {
+  const removeRoute = (i: number) =>
     setRoutes(routes.filter((_, idx) => idx !== i));
-  };
-
   const updateRoute = (i: number, field: string, value: string | number) => {
     const updated = [...routes];
     if (field === "damping") {
@@ -53,89 +105,201 @@ export default function NewMapping() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createMapping({
-      device_type: deviceType,
-      device_id: deviceId,
-      service_type: serviceType,
-      service_target: serviceTarget,
-      routes,
-      feedback: [],
-      active: true,
-    });
-    router.push("/");
+    setSubmitting(true);
+    setError(null);
+    try {
+      await createMapping({
+        edge_id: edgeId,
+        device_type: deviceType,
+        device_id: deviceId,
+        service_type: serviceType,
+        service_target: serviceTarget,
+        routes,
+        feedback: [],
+        active: true,
+      });
+      router.push("/mappings");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6 dark:text-white">New Mapping</h1>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-zinc-300">Device Type</label>
-              <input value={deviceType} onChange={(e) => setDeviceType(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 dark:bg-zinc-800 dark:border-zinc-600 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-zinc-300">Device ID</label>
-              <input value={deviceId} onChange={(e) => setDeviceId(e.target.value)}
-                placeholder="C3:81:DF:4E:FF:6A"
-                className="w-full border rounded-lg px-3 py-2 dark:bg-zinc-800 dark:border-zinc-600 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-zinc-300">Service Type</label>
-              <input value={serviceType} onChange={(e) => setServiceType(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 dark:bg-zinc-800 dark:border-zinc-600 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-zinc-300">Service Target (ID)</label>
-              <input value={serviceTarget} onChange={(e) => setServiceTarget(e.target.value)}
-                placeholder="16017ec9318..."
-                className="w-full border rounded-lg px-3 py-2 dark:bg-zinc-800 dark:border-zinc-600 dark:text-white" />
-            </div>
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold">New mapping</h2>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && (
+          <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700">
+            {error}
           </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            label="Edge ID"
+            value={edgeId}
+            onChange={setEdgeId}
+            suggestions={knownEdges}
+            placeholder="living-room"
+          />
+          <TextField
+            label="Device Type"
+            value={deviceType}
+            onChange={setDeviceType}
+          />
+          <TextField
+            label="Device ID"
+            value={deviceId}
+            onChange={setDeviceId}
+            suggestions={knownDevices}
+            placeholder="C3:81:DF:4E:FF:6A"
+          />
+          <TextField
+            label="Service Type"
+            value={serviceType}
+            onChange={setServiceType}
+          />
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium">
+              Service Target
+            </label>
+            {knownTargets.length > 0 && (
+              <select
+                value={serviceTarget}
+                onChange={(e) => setServiceTarget(e.target.value)}
+                className="mb-2 w-full rounded-lg border bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <option value="">— pick a detected zone —</option>
+                {knownTargets.map((t) => (
+                  <option key={t.target} value={t.target}>
+                    {t.label} ({t.target.slice(0, 10)}…)
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              value={serviceTarget}
+              onChange={(e) => setServiceTarget(e.target.value)}
+              placeholder="16017ec931848..."
+              className="w-full rounded-lg border bg-white px-3 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </div>
+        </div>
 
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-lg font-medium dark:text-white">Routes</h2>
-              <button type="button" onClick={addRoute}
-                className="text-blue-600 text-sm hover:underline">+ Add Route</button>
-            </div>
-            <div className="space-y-2">
-              {routes.map((route, i) => (
-                <div key={i} className="flex gap-2 items-center bg-white dark:bg-zinc-800 p-3 rounded-lg border dark:border-zinc-700">
-                  <select value={route.input} onChange={(e) => updateRoute(i, "input", e.target.value)}
-                    className="border rounded px-2 py-1 text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white">
-                    {INPUT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <span className="text-zinc-400">→</span>
-                  <select value={route.intent} onChange={(e) => updateRoute(i, "intent", e.target.value)}
-                    className="border rounded px-2 py-1 text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white">
-                    {INTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input type="number" value={route.params?.damping ?? 1}
-                    onChange={(e) => updateRoute(i, "damping", e.target.value)}
-                    className="w-20 border rounded px-2 py-1 text-sm dark:bg-zinc-700 dark:border-zinc-600 dark:text-white"
-                    title="Damping factor" />
-                  <button type="button" onClick={() => removeRoute(i)}
-                    className="text-red-500 text-sm">✕</button>
-                </div>
-              ))}
-            </div>
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-lg font-medium">Routes</h3>
+            <button
+              type="button"
+              onClick={addRoute}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              + Add route
+            </button>
           </div>
+          <div className="space-y-2">
+            {routes.map((route, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-lg border bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
+              >
+                <select
+                  value={route.input}
+                  onChange={(e) => updateRoute(i, "input", e.target.value)}
+                  className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {INPUT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-zinc-400">→</span>
+                <select
+                  value={route.intent}
+                  onChange={(e) => updateRoute(i, "intent", e.target.value)}
+                  className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                >
+                  {INTENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={route.params?.damping ?? 1}
+                  onChange={(e) => updateRoute(i, "damping", e.target.value)}
+                  className="w-20 rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                  title="Damping factor"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeRoute(i)}
+                  className="text-sm text-red-500 hover:underline"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          <div className="flex gap-3">
-            <button type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-              Create Mapping
-            </button>
-            <button type="button" onClick={() => router.push("/")}
-              className="border px-6 py-2 rounded-lg hover:bg-zinc-100 dark:border-zinc-600 dark:text-white dark:hover:bg-zinc-800">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {submitting ? "Creating…" : "Create mapping"}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/mappings")}
+            className="rounded-lg border px-6 py-2 dark:border-zinc-700"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  onChange,
+  suggestions,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  suggestions?: string[];
+  placeholder?: string;
+}) {
+  const listId = suggestions && suggestions.length > 0
+    ? `${label.replace(/\s/g, "-")}-suggestions`
+    : undefined;
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium">{label}</label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        list={listId}
+        className="w-full rounded-lg border bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+      />
+      {listId && suggestions && (
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      )}
     </div>
   );
 }

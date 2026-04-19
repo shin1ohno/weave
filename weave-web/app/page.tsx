@@ -1,94 +1,78 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { listMappings, deleteMapping, type Mapping } from "@/lib/api";
+import { useUIState } from "@/lib/ws";
+import { EdgeCard } from "@/components/EdgeCard";
+import { ZoneCard } from "@/components/ZoneCard";
 
-export default function Dashboard() {
-  const [mappings, setMappings] = useState<Mapping[]>([]);
-  const [error, setError] = useState<string | null>(null);
+export default function Overview() {
+  const state = useUIState();
 
-  const load = () => {
-    listMappings()
-      .then(setMappings)
-      .catch((e) => setError(e.message));
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this mapping?")) return;
-    await deleteMapping(id);
-    load();
-  };
+  const roonTargets = new Map<string, typeof state.serviceStates>();
+  for (const s of state.serviceStates) {
+    if (s.service_type !== "roon") continue;
+    const list = roonTargets.get(s.target) ?? [];
+    list.push(s);
+    roonTargets.set(s.target, list);
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold dark:text-white">weave</h1>
-          <Link
-            href="/mappings/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+    <div className="space-y-10">
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Overview</h2>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+              state.connected
+                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+            }`}
           >
-            New Mapping
-          </Link>
+            <span
+              className={`h-2 w-2 rounded-full ${
+                state.connected ? "bg-green-500" : "bg-zinc-400"
+              }`}
+            />
+            {state.connected ? "live" : "disconnected"}
+          </span>
         </div>
+      </section>
 
-        {error && (
-          <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-4">
-            {error} — Is weave-server running on port 3001?
+      <section>
+        <h3 className="mb-3 text-lg font-semibold">Edges</h3>
+        {state.edges.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            No edges connected yet. Start an edge-agent pointing at
+            ws://HOST/ws/edge.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {state.edges
+              .slice()
+              .sort((a, b) => a.edge_id.localeCompare(b.edge_id))
+              .map((e) => (
+                <EdgeCard key={e.edge_id} edge={e} />
+              ))}
           </div>
         )}
+      </section>
 
-        {mappings.length === 0 && !error && (
-          <p className="text-zinc-500 dark:text-zinc-400">
-            No mappings configured. Create one to start routing device events to services.
+      <section>
+        <h3 className="mb-3 text-lg font-semibold">Roon zones</h3>
+        {roonTargets.size === 0 ? (
+          <p className="text-sm text-zinc-500">
+            No zone state yet. An edge-agent with the `roon` adapter needs to
+            connect and pair with a Roon Core.
           </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from(roonTargets.entries())
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([target, states]) => (
+                <ZoneCard key={target} target={target} states={states} />
+              ))}
+          </div>
         )}
-
-        <div className="grid gap-4">
-          {mappings.map((m) => (
-            <div
-              key={m.mapping_id}
-              className="bg-white dark:bg-zinc-800 rounded-lg p-6 shadow-sm border border-zinc-200 dark:border-zinc-700"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`inline-block w-2 h-2 rounded-full ${m.active ? "bg-green-500" : "bg-zinc-400"}`} />
-                    <span className="font-medium dark:text-white">
-                      {m.device_type}/{m.device_id}
-                    </span>
-                    <span className="text-zinc-400">→</span>
-                    <span className="font-medium dark:text-white">
-                      {m.service_type}/{m.service_target}
-                    </span>
-                  </div>
-                  <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {m.routes.length} route{m.routes.length !== 1 ? "s" : ""}:{" "}
-                    {m.routes.map((r) => `${r.input}→${r.intent}`).join(", ")}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Link
-                    href={`/mappings/${m.mapping_id}`}
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(m.mapping_id)}
-                    className="text-red-600 hover:underline text-sm"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
