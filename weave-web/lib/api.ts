@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+// API base URL. Empty string means "same origin" (useful when weave-web is
+// proxied by Next.js rewrites to weave-server). Set NEXT_PUBLIC_API_URL for
+// standalone dev (e.g. npm run dev without the proxy).
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export interface Route {
   input: string;
@@ -98,12 +101,18 @@ export type UiFrame =
     }
   | { type: "glyphs_changed"; glyphs: Glyph[] };
 
-function wsUrl(path: string): string {
-  const base = API_BASE.replace(/^http/, "ws");
-  return `${base}${path}`;
+/** Compute absolute WebSocket URL. Called lazily from client code so that
+ * `window.location.origin` is available when API_BASE is empty (proxied
+ * deployment). */
+export function wsUrl(path: string): string {
+  if (API_BASE) {
+    return API_BASE.replace(/^http/, "ws") + path;
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin.replace(/^http/, "ws") + path;
+  }
+  return `ws://localhost${path}`;
 }
-
-export const WS_UI_URL = wsUrl("/ws/ui");
 
 // --- Mappings ---
 

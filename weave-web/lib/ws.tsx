@@ -16,7 +16,7 @@ import {
   Glyph,
   UiFrame,
   UiSnapshot,
-  WS_UI_URL,
+  wsUrl,
 } from "./api";
 
 interface UIState {
@@ -183,7 +183,7 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
 
     function open() {
       if (cancelled) return;
-      const ws = new WebSocket(WS_UI_URL);
+      const ws = new WebSocket(wsUrl("/ws/ui"));
       wsRef.current = ws;
 
       ws.onopen = () => {
