@@ -17,9 +17,9 @@ pub fn router() -> Router<AppCtx> {
     Router::new()
         .route("/api/mappings", get(list_mappings))
         .route("/api/mappings", post(create_mapping))
-        .route("/api/mappings/{id}", get(get_mapping))
-        .route("/api/mappings/{id}", put(update_mapping))
-        .route("/api/mappings/{id}", delete(delete_mapping))
+        .route("/api/mappings/:id", get(get_mapping))
+        .route("/api/mappings/:id", put(update_mapping))
+        .route("/api/mappings/:id", delete(delete_mapping))
         .route("/api/mappings/{id}/target", post(switch_target))
 }
 

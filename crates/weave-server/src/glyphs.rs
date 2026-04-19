@@ -121,9 +121,9 @@ fn default_set() -> Vec<Glyph> {
 pub fn router() -> Router<AppCtx> {
     Router::new()
         .route("/api/glyphs", get(list_glyphs))
-        .route("/api/glyphs/{name}", get(get_glyph))
-        .route("/api/glyphs/{name}", put(put_glyph))
-        .route("/api/glyphs/{name}", delete(delete_glyph))
+        .route("/api/glyphs/:name", get(get_glyph))
+        .route("/api/glyphs/:name", put(put_glyph))
+        .route("/api/glyphs/:name", delete(delete_glyph))
 }
 
 async fn list_glyphs(State(ctx): State<AppCtx>) -> Result<Json<Vec<Glyph>>, StatusCode> {
