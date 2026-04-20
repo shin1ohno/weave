@@ -2215,8 +2215,9 @@ dependencies = [
 
 [[package]]
 name = "weave-contracts"
-version = "0.1.0"
-source = "git+https://github.com/shin1ohno/edge-agent.git?branch=feat%2Fweave-contracts-target-candidates#53c14343f582974ecdd18669bc0202a5ecab33fd"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fc9f05494ae358a86fa5b1db95966cdfedb9b132deb2159434d75e2300c4acf"
 dependencies = [
  "serde",
  "serde_json",
