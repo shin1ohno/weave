@@ -5,10 +5,12 @@ import { useRouter, useParams } from "next/navigation";
 import {
   getMapping,
   updateMapping,
+  type FeedbackRule,
   type Mapping,
   type Route,
 } from "@/lib/api";
 import { useUIState, useUIDispatch } from "@/lib/ws";
+import { FeedbackSection } from "@/components/FeedbackSection";
 
 const INPUT_TYPES = [
   "rotate",
@@ -281,6 +283,13 @@ export default function EditMapping() {
           </div>
         ))}
       </div>
+
+      <FeedbackSection
+        feedback={mapping.feedback}
+        onChange={(next: FeedbackRule[]) => updateField("feedback", next)}
+        serviceType={mapping.service_type}
+        serviceTarget={mapping.service_target}
+      />
 
       <div className="flex gap-3">
         <button

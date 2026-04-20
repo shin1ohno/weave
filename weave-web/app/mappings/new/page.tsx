@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMapping, type Route } from "@/lib/api";
+import { createMapping, type FeedbackRule, type Route } from "@/lib/api";
 import { useUIState } from "@/lib/ws";
+import { FeedbackSection } from "@/components/FeedbackSection";
 
 const INPUT_TYPES = [
   "rotate",
@@ -59,6 +60,7 @@ export default function NewMapping() {
     { input: "swipe_right", intent: "next" },
     { input: "swipe_left", intent: "previous" },
   ]);
+  const [feedback, setFeedback] = useState<FeedbackRule[]>([]);
 
   const knownEdges = useMemo(
     () => state.edges.map((e) => e.edge_id).sort(),
@@ -114,7 +116,7 @@ export default function NewMapping() {
         service_type: serviceType,
         service_target: serviceTarget,
         routes,
-        feedback: [],
+        feedback,
         active: true,
       });
       router.push("/mappings");
@@ -244,6 +246,13 @@ export default function NewMapping() {
             ))}
           </div>
         </div>
+
+        <FeedbackSection
+          feedback={feedback}
+          onChange={setFeedback}
+          serviceType={serviceType}
+          serviceTarget={serviceTarget}
+        />
 
         <div className="flex gap-3">
           <button
