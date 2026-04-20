@@ -11,6 +11,13 @@ import {
 } from "@/lib/api";
 import { useUIState, useUIDispatch } from "@/lib/ws";
 import { FeedbackSection } from "@/components/FeedbackSection";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox, CheckboxField } from "@/components/ui/checkbox";
+import { Field, Label } from "@/components/ui/fieldset";
+import { Heading, Subheading } from "@/components/ui/heading";
+import { Text, TextLink } from "@/components/ui/text";
 
 const INPUT_TYPES = [
   "rotate",
@@ -79,7 +86,8 @@ export default function EditMapping() {
     return state.serviceStates
       .filter(
         (s) =>
-          s.service_type === mapping.service_type && s.property === metaProperty
+          s.service_type === mapping.service_type &&
+          s.property === metaProperty
       )
       .map((s) => ({
         target: s.target,
@@ -90,8 +98,8 @@ export default function EditMapping() {
       .filter((v, i, a) => a.findIndex((x) => x.target === v.target) === i);
   }, [state.serviceStates, mapping]);
 
-  if (error) return <div className="text-red-600">{error}</div>;
-  if (!mapping) return <div>Loading…</div>;
+  if (error) return <Text className="text-red-600">{error}</Text>;
+  if (!mapping) return <Text>Loading…</Text>;
 
   const updateField = <K extends keyof Mapping>(key: K, value: Mapping[K]) => {
     setMapping({ ...mapping, [key]: value });
@@ -132,29 +140,24 @@ export default function EditMapping() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Edit mapping</h2>
-        <button
-          onClick={() => router.push("/mappings")}
-          className="text-sm text-zinc-500 hover:underline"
-        >
-          ← Back
-        </button>
+        <Heading>Edit mapping</Heading>
+        <TextLink href="/mappings">← Back</TextLink>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700">
+        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
           {error}
         </div>
       )}
 
-      <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="space-y-4 rounded-lg border border-zinc-950/5 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Edge ID">
-            <input
+          <Field>
+            <Label>Edge ID</Label>
+            <Input
               value={mapping.edge_id}
               onChange={(e) => updateField("edge_id", e.target.value)}
               list="edge-ids"
-              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
             <datalist id="edge-ids">
               {state.edges.map((e) => (
@@ -162,124 +165,120 @@ export default function EditMapping() {
               ))}
             </datalist>
           </Field>
-          <Field label="Active">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={mapping.active}
-                onChange={(e) => updateField("active", e.target.checked)}
-              />
-              {mapping.active ? "active" : "inactive"}
-            </label>
-          </Field>
-          <Field label="Device Type">
-            <input
+          <CheckboxField>
+            <Checkbox
+              checked={mapping.active}
+              onChange={(checked) => updateField("active", checked)}
+            />
+            <Label>Active</Label>
+          </CheckboxField>
+          <Field>
+            <Label>Device Type</Label>
+            <Input
               value={mapping.device_type}
               onChange={(e) => updateField("device_type", e.target.value)}
-              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </Field>
-          <Field label="Device ID">
-            <input
+          <Field>
+            <Label>Device ID</Label>
+            <Input
               value={mapping.device_id}
               onChange={(e) => updateField("device_id", e.target.value)}
-              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </Field>
-          <Field label="Service Type">
-            <input
+          <Field>
+            <Label>Service Type</Label>
+            <Input
               value={mapping.service_type}
               onChange={(e) => updateField("service_type", e.target.value)}
-              className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
           </Field>
-          <div>
-            <label className="mb-1 block text-sm font-medium">
-              Service Target
-            </label>
-            {knownTargets.length > 0 && (
-              <select
-                value={mapping.service_target}
-                onChange={(e) =>
-                  updateField("service_target", e.target.value)
-                }
-                className="mb-2 w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              >
-                <option value="">— pick —</option>
-                {knownTargets.map((t) => (
-                  <option key={t.target} value={t.target}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            <input
+          <div className="space-y-2">
+            <Field>
+              <Label>Service Target</Label>
+              {knownTargets.length > 0 && (
+                <Select
+                  value={mapping.service_target}
+                  onChange={(e) =>
+                    updateField("service_target", e.target.value)
+                  }
+                >
+                  <option value="">— pick —</option>
+                  {knownTargets.map((t) => (
+                    <option key={t.target} value={t.target}>
+                      {t.label}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Input
               value={mapping.service_target}
               onChange={(e) => updateField("service_target", e.target.value)}
-              className="w-full rounded border bg-white px-3 py-2 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              className="font-mono"
             />
           </div>
         </div>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="space-y-3 rounded-lg border border-zinc-950/5 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
         <div className="flex items-center justify-between">
-          <h3 className="font-medium">Routes</h3>
-          <button
-            type="button"
-            onClick={addRoute}
-            className="text-sm text-blue-600 hover:underline"
-          >
+          <Subheading level={3}>Routes</Subheading>
+          <Button type="button" plain onClick={addRoute}>
             + Add route
-          </button>
+          </Button>
         </div>
         {mapping.routes.map((route, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <select
-              value={route.input}
-              onChange={(e) =>
-                updateRoute(i, { ...route, input: e.target.value })
-              }
-              className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              {INPUT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <div className="min-w-40">
+              <Select
+                value={route.input}
+                onChange={(e) =>
+                  updateRoute(i, { ...route, input: e.target.value })
+                }
+              >
+                {INPUT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <span className="text-zinc-400">→</span>
-            <select
-              value={route.intent}
-              onChange={(e) =>
-                updateRoute(i, { ...route, intent: e.target.value })
-              }
-              className="rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              {INTENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={route.params?.damping ?? 1}
-              onChange={(e) =>
-                updateRoute(i, {
-                  ...route,
-                  params: { damping: Number(e.target.value) },
-                })
-              }
-              className="w-20 rounded border px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            <button
+            <div className="min-w-40">
+              <Select
+                value={route.intent}
+                onChange={(e) =>
+                  updateRoute(i, { ...route, intent: e.target.value })
+                }
+              >
+                {INTENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="w-24">
+              <Input
+                type="number"
+                value={route.params?.damping ?? 1}
+                onChange={(e) =>
+                  updateRoute(i, {
+                    ...route,
+                    params: { damping: Number(e.target.value) },
+                  })
+                }
+              />
+            </div>
+            <Button
               type="button"
+              plain
               onClick={() => removeRoute(i)}
-              className="text-sm text-red-500 hover:underline"
+              className="!text-red-600"
             >
               ✕
-            </button>
+            </Button>
           </div>
         ))}
       </div>
@@ -292,29 +291,10 @@ export default function EditMapping() {
       />
 
       <div className="flex gap-3">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-60"
-        >
+        <Button onClick={handleSave} disabled={saving} color="blue">
           {saving ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium">{label}</label>
-      {children}
     </div>
   );
 }

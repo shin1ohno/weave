@@ -1,4 +1,6 @@
 import { ServiceStateEntry } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
+import { Subheading } from "@/components/ui/heading";
 
 interface Props {
   target: string;
@@ -19,6 +21,16 @@ type NowPlayingVal = {
   length?: number;
 };
 
+const PLAYBACK_COLORS: Record<
+  string,
+  "green" | "yellow" | "zinc" | "blue"
+> = {
+  playing: "green",
+  paused: "yellow",
+  stopped: "zinc",
+  loading: "blue",
+};
+
 export function ZoneCard({ target, states }: Props) {
   const playback = states.find((s) => s.property === "playback");
   const nowPlaying = states.find((s) => s.property === "now_playing");
@@ -34,32 +46,24 @@ export function ZoneCard({ target, states }: Props) {
 
   const pbValue =
     typeof playback?.value === "string" ? playback.value : "unknown";
-  const pbColor = {
-    playing:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    paused:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    stopped: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-    loading:
-      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  }[pbValue] || "bg-zinc-100 text-zinc-600";
+  const pbColor = PLAYBACK_COLORS[pbValue] ?? "zinc";
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">{displayName}</h3>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${pbColor}`}
-        >
-          {pbValue}
-        </span>
+    <div className="rounded-lg border border-zinc-950/5 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-zinc-900">
+      <div className="flex items-center justify-between gap-2">
+        <Subheading level={3} className="truncate">
+          {displayName}
+        </Subheading>
+        <Badge color={pbColor}>{pbValue}</Badge>
       </div>
       <p className="mt-1 font-mono text-[10px] text-zinc-400 break-all">
         {target}
       </p>
       {np?.two_line?.line1 && (
         <div className="mt-3">
-          <p className="text-sm font-medium truncate">{np.two_line.line1}</p>
+          <p className="text-sm font-medium truncate text-zinc-950 dark:text-white">
+            {np.two_line.line1}
+          </p>
           {np.two_line.line2 && (
             <p className="text-xs text-zinc-500 truncate">
               {np.two_line.line2}

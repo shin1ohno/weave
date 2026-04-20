@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Vendor: Tailwind Plus Catalyst components. Kept pristine so future kit
+  // updates apply cleanly — relax lint rules that conflict with upstream style.
+  {
+    files: ["components/ui/**"],
+    rules: {
+      "prefer-const": "off",
+      "@next/next/no-img-element": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

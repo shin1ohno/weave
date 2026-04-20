@@ -2,6 +2,8 @@
 
 import { useUIState } from "@/lib/ws";
 import { EdgeCard } from "@/components/EdgeCard";
+import { Heading } from "@/components/ui/heading";
+import { Text } from "@/components/ui/text";
 
 export default function EdgesList() {
   const state = useUIState();
@@ -12,12 +14,12 @@ export default function EdgesList() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Edges</h2>
+      <Heading>Edges</Heading>
       {sorted.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          No edges have ever connected. An edge-agent pointing at ws://HOST/ws/edge
-          will register itself here.
-        </p>
+        <Text>
+          No edges have ever connected. An edge-agent pointing at
+          ws://HOST/ws/edge will register itself here.
+        </Text>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((e) => (

@@ -4,6 +4,9 @@ import { useUIState } from "@/lib/ws";
 import { EdgeCard } from "@/components/EdgeCard";
 import { ZoneCard } from "@/components/ZoneCard";
 import { LightCard } from "@/components/LightCard";
+import { Heading, Subheading } from "@/components/ui/heading";
+import { Text } from "@/components/ui/text";
+import { Badge } from "@/components/ui/badge";
 
 export default function Overview() {
   const state = useUIState();
@@ -23,32 +26,26 @@ export default function Overview() {
   return (
     <div className="space-y-10">
       <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Overview</h2>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-              state.connected
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-            }`}
-          >
+        <div className="flex items-center justify-between">
+          <Heading>Overview</Heading>
+          <Badge color={state.connected ? "green" : "zinc"}>
             <span
               className={`h-2 w-2 rounded-full ${
                 state.connected ? "bg-green-500" : "bg-zinc-400"
               }`}
             />
             {state.connected ? "live" : "disconnected"}
-          </span>
+          </Badge>
         </div>
       </section>
 
-      <section>
-        <h3 className="mb-3 text-lg font-semibold">Edges</h3>
+      <section className="space-y-3">
+        <Subheading level={3}>Edges</Subheading>
         {state.edges.length === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <Text>
             No edges connected yet. Start an edge-agent pointing at
             ws://HOST/ws/edge.
-          </p>
+          </Text>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {state.edges
@@ -61,13 +58,13 @@ export default function Overview() {
         )}
       </section>
 
-      <section>
-        <h3 className="mb-3 text-lg font-semibold">Roon zones</h3>
+      <section className="space-y-3">
+        <Subheading level={3}>Roon zones</Subheading>
         {roonTargets.size === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <Text>
             No zone state yet. An edge-agent with the `roon` adapter needs to
             connect and pair with a Roon Core.
-          </p>
+          </Text>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from(roonTargets.entries())
@@ -79,13 +76,13 @@ export default function Overview() {
         )}
       </section>
 
-      <section>
-        <h3 className="mb-3 text-lg font-semibold">Hue lights</h3>
+      <section className="space-y-3">
+        <Subheading level={3}>Hue lights</Subheading>
         {hueLights.length === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <Text>
             No Hue state yet. An edge-agent with the `hue` adapter (pair it
             via `edge-agent pair-hue`) needs to be connected.
-          </p>
+          </Text>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {hueLights.map((entry) => (

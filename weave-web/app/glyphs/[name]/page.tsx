@@ -11,6 +11,9 @@ import {
 import { useUIState, useUIDispatch } from "@/lib/ws";
 import { GlyphEditor } from "@/components/GlyphEditor";
 import { GlyphPreview } from "@/components/GlyphPreview";
+import { Button } from "@/components/ui/button";
+import { Heading, Subheading } from "@/components/ui/heading";
+import { Text, TextLink } from "@/components/ui/text";
 
 export default function GlyphEditPage() {
   const router = useRouter();
@@ -35,8 +38,8 @@ export default function GlyphEditPage() {
     getGlyph(name).then(setGlyph).catch((e) => setError(e.message));
   }, [name, fromLive]);
 
-  if (error) return <div className="text-red-600">{error}</div>;
-  if (!glyph) return <div>Loading…</div>;
+  if (error) return <Text className="text-red-600">{error}</Text>;
+  if (!glyph) return <Text>Loading…</Text>;
 
   const save = async () => {
     setSaving(true);
@@ -65,17 +68,12 @@ export default function GlyphEditPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{glyph.name}</h2>
-        <button
-          onClick={() => router.push("/glyphs")}
-          className="text-sm text-zinc-500 hover:underline"
-        >
-          ← Back
-        </button>
+        <Heading>{glyph.name}</Heading>
+        <TextLink href="/glyphs">← Back</TextLink>
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700">
+        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
           {error}
         </div>
       )}
@@ -90,7 +88,7 @@ export default function GlyphEditPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-zinc-500">Editor</h3>
+          <Subheading level={3}>Editor</Subheading>
           <GlyphEditor
             pattern={glyph.pattern}
             onChange={(pattern) => setGlyph({ ...glyph, pattern })}
@@ -98,9 +96,9 @@ export default function GlyphEditPage() {
           />
         </div>
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-zinc-500">Preview</h3>
+          <Subheading level={3}>Preview</Subheading>
           <GlyphPreview pattern={glyph.pattern} glyph={glyph} size={180} />
-          <h3 className="text-sm font-medium text-zinc-500">ASCII</h3>
+          <Subheading level={3}>ASCII</Subheading>
           <pre className="rounded-lg bg-zinc-900 p-3 text-xs text-zinc-100">
 {glyph.pattern}
           </pre>
@@ -108,20 +106,17 @@ export default function GlyphEditPage() {
       </div>
 
       <div className="flex gap-3">
-        <button
+        <Button
           onClick={save}
           disabled={saving || glyph.builtin}
-          className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-60"
+          color="blue"
         >
           {saving ? "Saving…" : "Save"}
-        </button>
+        </Button>
         {!glyph.builtin && (
-          <button
-            onClick={del}
-            className="rounded-lg border border-red-300 px-6 py-2 text-red-600 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-950"
-          >
+          <Button onClick={del} outline className="!text-red-600">
             Delete
-          </button>
+          </Button>
         )}
       </div>
     </div>
