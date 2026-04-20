@@ -1,6 +1,11 @@
 [workspace]
 dependencies_update = true
-semver_check = true
+# semver_check は off。0.1.0 の Cargo.toml.orig が edge-agent への path dep を
+# 残したまま publish された影響で、release-plz が旧 commit を git checkout し
+# て cargo package を走らせた時に manifest 解決不能で落ちるため。0.1.0 は既に
+# yank 済で consumer への影響は無し。0.1.1 以降は clean manifest なので、将来
+# 再度 on にして問題ないか再検証しても良い。
+semver_check = false
 git_release_enable = true
 git_tag_enable = true
 
