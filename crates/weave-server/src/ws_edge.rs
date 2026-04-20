@@ -166,6 +166,20 @@ async fn handle_edge_text(
         EdgeToServer::Pong => {
             tracing::trace!(edge_id = ?edge_id, "pong");
         }
+        EdgeToServer::SwitchTarget {
+            mapping_id,
+            service_target,
+        } => {
+            let applied =
+                crate::api::apply_switch_target(ctx, mapping_id, &service_target).await;
+            tracing::info!(
+                edge_id = ?edge_id,
+                ?mapping_id,
+                service_target = %service_target,
+                applied,
+                "edge-driven target switch"
+            );
+        }
     }
     Ok(())
 }
