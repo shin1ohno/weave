@@ -14,17 +14,25 @@ use weave_contracts::{Glyph, ServerToEdge, UiFrame};
 use crate::ctx::AppCtx;
 use crate::sqlite_store::SqliteStore;
 
+mod font;
+
 /// Seed the default glyph set when the table is empty. Safe to call on every
-/// startup — becomes a no-op once at least one row exists.
+/// startup — the named baseline (play / pause / ...) only seeds when the
+/// table is empty, but the programmatic A-Z + 00-99 set is upserted
+/// unconditionally so version bumps to their bitmaps propagate without a
+/// DB wipe.
 pub async fn seed_defaults(store: &SqliteStore) -> anyhow::Result<()> {
     let n = store.glyph_count().await?;
-    if n > 0 {
-        return Ok(());
+    if n == 0 {
+        for glyph in default_set() {
+            store.upsert_glyph(&glyph).await?;
+        }
+        tracing::info!("seeded default glyph set");
     }
-    for glyph in default_set() {
+    for glyph in font::generated_set() {
         store.upsert_glyph(&glyph).await?;
     }
-    tracing::info!("seeded default glyph set");
+    tracing::info!("refreshed font glyph set (A-Z + 00-99)");
     Ok(())
 }
 
