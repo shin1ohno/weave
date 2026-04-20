@@ -19,9 +19,11 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
 
-# Use the sibling edge-agent checkout's weave-contracts during local
-# development of in-progress schema changes (target_candidates /
-# target_switch_on). Remove this patch and bump the crates.io dep in
-# weave-server/Cargo.toml once the extended weave-contracts is published.
+# TEMPORARY: pull the in-progress weave-contracts schema changes
+# (target_candidates / target_switch_on) from the edge-agent PR branch
+# so both local dev and GitHub Actions CI can build. Once
+# shin1ohno/edge-agent#8 merges and weave-contracts is published at the
+# new version, drop this patch and bump the crates.io dep in
+# crates/weave-server/Cargo.toml.
 [patch.crates-io]
-weave-contracts = { path = "../edge-agent/crates/weave-contracts" }
+weave-contracts = { git = "https://github.com/shin1ohno/edge-agent.git", branch = "feat/weave-contracts-target-candidates" }

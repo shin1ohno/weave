@@ -2216,6 +2216,7 @@ dependencies = [
 [[package]]
 name = "weave-contracts"
 version = "0.1.0"
+source = "git+https://github.com/shin1ohno/edge-agent.git?branch=feat%2Fweave-contracts-target-candidates#53c14343f582974ecdd18669bc0202a5ecab33fd"
 dependencies = [
  "serde",
  "serde_json",
