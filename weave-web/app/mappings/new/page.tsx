@@ -23,6 +23,8 @@ const INPUT_TYPES = [
   "key_press",
 ];
 
+const SERVICE_TYPES = ["roon", "hue", "gryph"];
+
 const INTENT_TYPES = [
   "play",
   "pause",
@@ -74,7 +76,13 @@ export default function NewMapping() {
     [state.deviceStates, deviceType]
   );
   const knownTargets = useMemo(() => {
-    const metaProperty = serviceType === "hue" ? "light" : "zone";
+    const metaProperty =
+      serviceType === "hue"
+        ? "light"
+        : serviceType === "roon"
+          ? "zone"
+          : null;
+    if (!metaProperty) return [];
     return state.serviceStates
       .filter(
         (s) => s.service_type === serviceType && s.property === metaProperty
@@ -154,11 +162,22 @@ export default function NewMapping() {
             suggestions={knownDevices}
             placeholder="C3:81:DF:4E:FF:6A"
           />
-          <TextField
-            label="Service Type"
-            value={serviceType}
-            onChange={setServiceType}
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Service Type
+            </label>
+            <select
+              value={serviceType}
+              onChange={(e) => setServiceType(e.target.value)}
+              className="w-full rounded-lg border bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+            >
+              {SERVICE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium">
               Service Target

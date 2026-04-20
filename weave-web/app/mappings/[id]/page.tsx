@@ -28,6 +28,8 @@ const INPUT_TYPES = [
   "key_press",
 ];
 
+const SERVICE_TYPES = ["roon", "hue", "gryph"];
+
 const INTENT_TYPES = [
   "play",
   "pause",
@@ -73,7 +75,13 @@ export default function EditMapping() {
 
   const knownTargets = useMemo(() => {
     if (!mapping) return [];
-    const metaProperty = mapping.service_type === "hue" ? "light" : "zone";
+    const metaProperty =
+      mapping.service_type === "hue"
+        ? "light"
+        : mapping.service_type === "roon"
+          ? "zone"
+          : null;
+    if (!metaProperty) return [];
     return state.serviceStates
       .filter(
         (s) =>
@@ -185,11 +193,20 @@ export default function EditMapping() {
             />
           </Field>
           <Field label="Service Type">
-            <input
+            <select
               value={mapping.service_type}
               onChange={(e) => updateField("service_type", e.target.value)}
               className="w-full rounded border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            />
+            >
+              {(SERVICE_TYPES.includes(mapping.service_type)
+                ? SERVICE_TYPES
+                : [mapping.service_type, ...SERVICE_TYPES]
+              ).map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </Field>
           <div>
             <label className="mb-1 block text-sm font-medium">
