@@ -1,0 +1,7 @@
+target/
+.git/
+.github/
+.claude/
+weave-web/
+*.md
+release-plz.toml
