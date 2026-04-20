@@ -8,9 +8,11 @@ import {
   type FeedbackRule,
   type Mapping,
   type Route,
+  type TargetCandidate,
 } from "@/lib/api";
 import { useUIState, useUIDispatch } from "@/lib/ws";
 import { FeedbackSection } from "@/components/FeedbackSection";
+import { TargetCandidatesSection } from "@/components/TargetCandidatesSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -282,6 +284,19 @@ export default function EditMapping() {
           </div>
         ))}
       </div>
+
+      <TargetCandidatesSection
+        candidates={mapping.target_candidates ?? []}
+        switchOn={mapping.target_switch_on ?? null}
+        onCandidatesChange={(next: TargetCandidate[]) =>
+          updateField("target_candidates", next)
+        }
+        onSwitchOnChange={(next: string | null) =>
+          updateField("target_switch_on", next)
+        }
+        serviceType={mapping.service_type}
+        serviceTarget={mapping.service_target}
+      />
 
       <FeedbackSection
         feedback={mapping.feedback}

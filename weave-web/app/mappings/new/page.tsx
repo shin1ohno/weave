@@ -2,9 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMapping, type FeedbackRule, type Route } from "@/lib/api";
+import {
+  createMapping,
+  type FeedbackRule,
+  type Route,
+  type TargetCandidate,
+} from "@/lib/api";
 import { useUIState } from "@/lib/ws";
 import { FeedbackSection } from "@/components/FeedbackSection";
+import { TargetCandidatesSection } from "@/components/TargetCandidatesSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -66,6 +72,10 @@ export default function NewMapping() {
     { input: "swipe_left", intent: "previous" },
   ]);
   const [feedback, setFeedback] = useState<FeedbackRule[]>([]);
+  const [targetCandidates, setTargetCandidates] = useState<TargetCandidate[]>(
+    []
+  );
+  const [switchOn, setSwitchOn] = useState<string | null>(null);
 
   const knownEdges = useMemo(
     () => state.edges.map((e) => e.edge_id).sort(),
@@ -123,6 +133,8 @@ export default function NewMapping() {
         routes,
         feedback,
         active: true,
+        target_candidates: targetCandidates,
+        target_switch_on: switchOn,
       });
       router.push("/mappings");
     } catch (err) {
@@ -254,6 +266,15 @@ export default function NewMapping() {
             ))}
           </div>
         </div>
+
+        <TargetCandidatesSection
+          candidates={targetCandidates}
+          switchOn={switchOn}
+          onCandidatesChange={setTargetCandidates}
+          onSwitchOnChange={setSwitchOn}
+          serviceType={serviceType}
+          serviceTarget={serviceTarget}
+        />
 
         <FeedbackSection
           feedback={feedback}

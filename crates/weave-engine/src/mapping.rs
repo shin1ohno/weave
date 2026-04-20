@@ -20,10 +20,24 @@ pub struct Mapping {
     pub feedback: Vec<FeedbackRule>,
     #[serde(default = "default_true")]
     pub active: bool,
+    #[serde(default)]
+    pub target_candidates: Vec<TargetCandidate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_switch_on: Option<String>,
 }
 
 fn default_true() -> bool {
     true
+}
+
+/// Pre-configured destination the edge can switch to in selection mode.
+/// See `weave_contracts::TargetCandidate` for the wire schema.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TargetCandidate {
+    pub target: String,
+    #[serde(default)]
+    pub label: String,
+    pub glyph: String,
 }
 
 /// A rule for sending feedback from service state to device display.
@@ -56,6 +70,8 @@ impl Mapping {
             routes,
             feedback: Vec::new(),
             active: true,
+            target_candidates: Vec::new(),
+            target_switch_on: None,
         }
     }
 
