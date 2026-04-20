@@ -176,7 +176,7 @@ function FeedbackRuleRow({
   return (
     <div className="space-y-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs text-zinc-500">state</label>
+        <label className="text-xs text-zinc-500">property</label>
         <input
           value={rule.state}
           onChange={(e) => onChange({ ...rule, state: e.target.value })}
@@ -210,6 +210,9 @@ function FeedbackRuleRow({
         </button>
       </div>
       <div className="space-y-1 pl-4">
+        <p className="text-xs text-zinc-500">
+          Values ({rule.state || "property"} → glyph)
+        </p>
         {entries.length === 0 && (
           <p className="text-xs text-zinc-400">No value → glyph pairs yet.</p>
         )}
@@ -227,7 +230,7 @@ function FeedbackRuleRow({
                     ? `feedback-vals-${idx}`
                     : undefined
                 }
-                placeholder="state value"
+                placeholder="value"
                 className="w-36 rounded border bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
               />
               {valueSuggestions.length > 0 && (
