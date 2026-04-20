@@ -18,3 +18,10 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
+
+# Use the sibling edge-agent checkout's weave-contracts during local
+# development of in-progress schema changes (target_candidates /
+# target_switch_on). Remove this patch and bump the crates.io dep in
+# weave-server/Cargo.toml once the extended weave-contracts is published.
+[patch.crates-io]
+weave-contracts = { path = "../edge-agent/crates/weave-contracts" }

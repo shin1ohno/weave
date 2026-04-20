@@ -15,6 +15,12 @@ export interface FeedbackRule {
   mapping: unknown;
 }
 
+export interface TargetCandidate {
+  target: string;
+  label: string;
+  glyph: string;
+}
+
 export interface Mapping {
   mapping_id: string;
   edge_id: string;
@@ -25,6 +31,8 @@ export interface Mapping {
   routes: Route[];
   feedback: FeedbackRule[];
   active: boolean;
+  target_candidates: TargetCandidate[];
+  target_switch_on: string | null;
 }
 
 export interface Glyph {
