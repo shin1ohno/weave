@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useUIState, useUIDispatch } from "@/lib/ws";
 import { putGlyph } from "@/lib/api";
 import { GlyphPreview } from "@/components/GlyphPreview";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/heading";
+import { Badge } from "@/components/ui/badge";
 
 export default function GlyphsList() {
   const state = useUIState();
@@ -14,7 +18,9 @@ export default function GlyphsList() {
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const sorted = state.glyphs.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = state.glyphs
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,22 +44,19 @@ export default function GlyphsList() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Glyphs</h2>
+      <Heading>Glyphs</Heading>
 
       <form onSubmit={handleCreate} className="flex gap-2">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="new glyph name"
-          className="flex-1 rounded-lg border bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
-        <button
-          type="submit"
-          disabled={creating}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
-        >
+        <div className="flex-1">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="new glyph name"
+          />
+        </div>
+        <Button type="submit" disabled={creating} color="blue">
           Create
-        </button>
+        </Button>
       </form>
 
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -61,15 +64,13 @@ export default function GlyphsList() {
           <Link
             key={g.name}
             href={`/glyphs/${encodeURIComponent(g.name)}`}
-            className="rounded-lg border border-zinc-200 bg-white p-4 shadow-sm hover:border-blue-400 dark:border-zinc-700 dark:bg-zinc-900"
+            className="rounded-lg border border-zinc-950/5 bg-white p-4 shadow-sm hover:border-blue-400 dark:border-white/10 dark:bg-zinc-900 dark:hover:border-blue-500"
           >
-            <div className="flex items-center justify-between">
-              <span className="font-medium">{g.name}</span>
-              {g.builtin && (
-                <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  builtin
-                </span>
-              )}
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-zinc-950 dark:text-white">
+                {g.name}
+              </span>
+              {g.builtin && <Badge color="zinc">builtin</Badge>}
             </div>
             <div className="mt-3 flex justify-center">
               <GlyphPreview pattern={g.pattern} glyph={g} size={100} />

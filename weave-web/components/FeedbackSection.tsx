@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { useUIState } from "@/lib/ws";
 import { GlyphPreview } from "./GlyphPreview";
 import type { FeedbackRule, Glyph } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Subheading } from "@/components/ui/heading";
+import { Text, Code } from "@/components/ui/text";
 
 // Properties reserved as target-identity meta; filtered out from feedback
 // property suggestions because they don't carry state-change values to display.
@@ -78,23 +83,19 @@ export function FeedbackSection({
     onChange(feedback.filter((_, idx) => idx !== i));
 
   return (
-    <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="space-y-3 rounded-lg border border-zinc-950/5 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">Feedback</h3>
-        <button
-          type="button"
-          onClick={addRule}
-          className="text-sm text-blue-600 hover:underline"
-        >
+        <Subheading level={3}>Feedback</Subheading>
+        <Button type="button" plain onClick={addRule}>
           + Add feedback rule
-        </button>
+        </Button>
       </div>
       {feedback.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <Text>
           No feedback rules. Display a glyph on state change —
-          e.g. <code>playback</code>: <code>playing → play</code>,{" "}
-          <code>paused → pause</code>.
-        </p>
+          e.g. <Code>playback</Code>: <Code>playing → play</Code>,{" "}
+          <Code>paused → pause</Code>.
+        </Text>
       )}
       {feedback.map((rule, i) => (
         <FeedbackRuleRow
@@ -156,15 +157,11 @@ function FeedbackRuleRow({
 
   const setEntryKey = (idx: number, key: string) =>
     commit(
-      entries.map((e, i): [string, string] =>
-        i === idx ? [key, e[1]] : e
-      )
+      entries.map((e, i): [string, string] => (i === idx ? [key, e[1]] : e))
     );
   const setEntryGlyph = (idx: number, glyph: string) =>
     commit(
-      entries.map((e, i): [string, string] =>
-        i === idx ? [e[0], glyph] : e
-      )
+      entries.map((e, i): [string, string] => (i === idx ? [e[0], glyph] : e))
     );
   const removeEntry = (idx: number) =>
     commit(entries.filter((_, i) => i !== idx));
@@ -174,18 +171,23 @@ function FeedbackRuleRow({
   const valueSuggestions = rule.state ? suggestValuesFor(rule.state) : [];
 
   return (
-    <div className="space-y-2 rounded border border-zinc-200 p-3 dark:border-zinc-700">
+    <div className="space-y-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs text-zinc-500">property</label>
-        <input
-          value={rule.state}
-          onChange={(e) => onChange({ ...rule, state: e.target.value })}
-          list={
-            knownProperties.length > 0 ? "feedback-props-suggest" : undefined
-          }
-          placeholder="e.g. playback"
-          className="flex-1 min-w-32 rounded border bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
+        <label className="text-xs text-zinc-500 dark:text-zinc-400">
+          property
+        </label>
+        <div className="min-w-32 flex-1">
+          <Input
+            value={rule.state}
+            onChange={(e) => onChange({ ...rule, state: e.target.value })}
+            list={
+              knownProperties.length > 0
+                ? "feedback-props-suggest"
+                : undefined
+            }
+            placeholder="e.g. playback"
+          />
+        </div>
         {knownProperties.length > 0 && (
           <datalist id="feedback-props-suggest">
             {knownProperties.map((p) => (
@@ -193,28 +195,29 @@ function FeedbackRuleRow({
             ))}
           </datalist>
         )}
-        <label className="text-xs text-zinc-500">type</label>
-        <select
-          value={rule.feedback_type}
-          disabled
-          className="rounded border bg-zinc-50 px-2 py-1 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800"
-        >
-          <option value="glyph">glyph</option>
-        </select>
-        <button
+        <label className="text-xs text-zinc-500 dark:text-zinc-400">
+          type
+        </label>
+        <div className="w-28">
+          <Select value={rule.feedback_type} disabled>
+            <option value="glyph">glyph</option>
+          </Select>
+        </div>
+        <Button
           type="button"
+          plain
           onClick={onRemove}
-          className="text-sm text-red-500 hover:underline"
+          className="!text-red-600"
         >
           ✕ rule
-        </button>
+        </Button>
       </div>
-      <div className="space-y-1 pl-4">
-        <p className="text-xs text-zinc-500">
+      <div className="space-y-2 pl-4">
+        <Text className="text-xs">
           Values ({rule.state || "property"} → glyph)
-        </p>
+        </Text>
         {entries.length === 0 && (
-          <p className="text-xs text-zinc-400">No value → glyph pairs yet.</p>
+          <Text className="text-xs">No value → glyph pairs yet.</Text>
         )}
         {entries.map(([value, glyphName], idx) => {
           const glyph = glyphsByName.get(glyphName);
@@ -222,17 +225,18 @@ function FeedbackRuleRow({
             glyphName === "" || glyphNames.includes(glyphName);
           return (
             <div key={idx} className="flex flex-wrap items-center gap-2">
-              <input
-                value={value}
-                onChange={(e) => setEntryKey(idx, e.target.value)}
-                list={
-                  valueSuggestions.length > 0
-                    ? `feedback-vals-${idx}`
-                    : undefined
-                }
-                placeholder="value"
-                className="w-36 rounded border bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
+              <div className="w-36">
+                <Input
+                  value={value}
+                  onChange={(e) => setEntryKey(idx, e.target.value)}
+                  list={
+                    valueSuggestions.length > 0
+                      ? `feedback-vals-${idx}`
+                      : undefined
+                  }
+                  placeholder="value"
+                />
+              </div>
               {valueSuggestions.length > 0 && (
                 <datalist id={`feedback-vals-${idx}`}>
                   {valueSuggestions.map((v) => (
@@ -241,21 +245,22 @@ function FeedbackRuleRow({
                 </datalist>
               )}
               <span className="text-zinc-400">→</span>
-              <select
-                value={glyphName}
-                onChange={(e) => setEntryGlyph(idx, e.target.value)}
-                className="rounded border bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              >
-                {!selectHasName && (
-                  <option value={glyphName}>{glyphName} (unknown)</option>
-                )}
-                <option value="">— pick glyph —</option>
-                {glyphNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+              <div className="min-w-40">
+                <Select
+                  value={glyphName}
+                  onChange={(e) => setEntryGlyph(idx, e.target.value)}
+                >
+                  {!selectHasName && (
+                    <option value={glyphName}>{glyphName} (unknown)</option>
+                  )}
+                  <option value="">— pick glyph —</option>
+                  {glyphNames.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </Select>
+              </div>
               {glyph && (
                 <GlyphPreview
                   pattern={glyph.pattern}
@@ -263,23 +268,20 @@ function FeedbackRuleRow({
                   size={32}
                 />
               )}
-              <button
+              <Button
                 type="button"
+                plain
                 onClick={() => removeEntry(idx)}
-                className="text-sm text-red-500 hover:underline"
+                className="!text-red-600"
               >
                 ✕
-              </button>
+              </Button>
             </div>
           );
         })}
-        <button
-          type="button"
-          onClick={addEntry}
-          className="text-xs text-blue-600 hover:underline"
-        >
+        <Button type="button" plain onClick={addEntry}>
           + Add value
-        </button>
+        </Button>
       </div>
     </div>
   );
