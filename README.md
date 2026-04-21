@@ -9,6 +9,77 @@ Two independent paths share the same config store:
 
 Both paths pull their mappings from the same `weave-server` HTTP API + SQLite store, so a single Web UI configures everything.
 
+## Big picture
+
+The system spans **four GitHub repos** that build three kinds of artifacts: hardware SDKs, a control-plane server, and per-host edge binaries. Everything meets at `weave-server`, which is the only stateful component.
+
+```
+Physical devices                 Edges (one per host)                  Control plane              Web UI
+──────────────────               ────────────────────                  ─────────────              ────────
+
+  Nuimo (BLE)                                                                                   ┌─────────────┐
+     │                                                                                          │  weave-web  │
+     │  BlueZ / CoreBluetooth                                                                   │  Next.js +  │
+     ▼                                                                                          │  Catalyst   │
+  ┌──────────┐   native SDK    ┌──────────────────┐                    ┌───────────────┐        └──────┬──────┘
+  │ nuimo-rs │◄────────────────┤ edge-agent       │   /ws/edge         │ weave-server  │ /ws/ui        │ HTTP
+  │ (SDK)    │    bluer /      │  ├ edge_core     │ ─────────────────► │  (axum+sqlx)  │ ◄────────────►┤
+  │          │    btleplug     │  ├ adapter_roon  │   ConfigFull       │               │  snapshot     │
+  │ nuimo-   │                 │  ├ adapter_hue   │   ConfigPatch      │  SQLite       │  + frames
+  │ mqtt ──┐ │                 │  └ ws_client     │   GlyphsUpdate     │  mappings     │               │
+  │ (MQTT) │ │                 └───┬────────┬─────┘   TargetSwitch     │  glyphs       │ REST          │
+  └────────┼─┘                     │        │         ◄── State (pump) │  edges        │ ◄─────────────┘
+           │ MQTT                  │ Roon   │ Hue                      │               │
+           ▼                       │ API    │ CLIP v2                  │  /api/*       │
+       ┌────────┐                  ▼        ▼                          └───────────────┘
+       │ mosqui-│          ┌──────────┐  ┌──────────┐
+       │ tto    │          │ roon-rs  │  │ (Hue     │
+       └───┬────┘          │ (SDK)    │  │  bridge) │
+           │ MQTT          │          │  └──────────┘
+           ▼               │ roon-hub │
+       ┌────────────┐      │ (MQTT    │
+       │ Roon Core  │◄─────┤ bridge)  │
+       │ (Zones,    │      └──────────┘
+       │  Outputs)  │
+       └────────────┘
+```
+
+### Repo → artifact map
+
+| Repo | Crates / apps | What ships where |
+|---|---|---|
+| [**shin1ohno/weave**](https://github.com/shin1ohno/weave) (this) | `weave-engine`, `weave-server`, `weave-web` | crates.io (server, engine) + Docker image (web). The control plane. |
+| [**shin1ohno/edge-agent**](https://github.com/shin1ohno/edge-agent) | `weave-contracts`, `edge-agent` | crates.io. Per-host binary + WS protocol types shared with `weave-server`. |
+| [**shin1ohno/nuimo-rs**](https://github.com/shin1ohno/nuimo-rs) | `nuimo`, `nuimo-mqtt` | crates.io. Nuimo BLE SDK (used by `edge-agent`) + optional MQTT bridge. |
+| [**shin1ohno/roon-rs**](https://github.com/shin1ohno/roon-rs) | `roon-api`, `roon-cli`, `roon-mcp`, `roon-hub` | crates.io + Docker Hub. Roon SOOD/MOO SDK (used by `edge-agent`) + `roon-hub` MQTT bridge. Also owns the canonical `compose.yml`. |
+
+### End-to-end: one Nuimo rotate tick (direct path)
+
+1. User rotates Nuimo. The knob emits a BLE notification on a GATT characteristic.
+2. `nuimo` SDK (inside `edge-agent`) decodes it into a `NuimoEvent::Rotate { delta }`.
+3. `edge-agent`'s `edge_core::routing` looks up the mapping for `(nuimo/<device_id>, rotate)` and builds an `Intent::VolumeChange { delta }`.
+4. `adapter_roon` converts the intent into a `roon-api` `Transport::change_volume` RPC, serialized over Roon's MOO protocol to the Core.
+5. The Core updates the zone's volume; Roon pushes a `ZoneEvent::Changed` back.
+6. `adapter_roon` emits a `StateUpdate` (property=`volume`, property=`playback`, etc.).
+7. `spawn_state_pump` forwards it as an `EdgeToServer::State` frame over `/ws/edge`.
+8. `weave-server` stores it and broadcasts a `UiFrame` over `/ws/ui`.
+9. `weave-web`'s `UIStateProvider` applies the frame; `ZonesPanel` re-renders with the new volume.
+10. `FeedbackPlan` (still inside `edge-agent`) picks a glyph (`volume_bar` parametrized by the new level) and writes it to the Nuimo LED over BLE — visible to the user ~10 ms after step 1.
+
+The MQTT path replaces steps 2–4 / 6–7 with `nuimo-mqtt` ↔ `mosquitto` ↔ `weave-server` ↔ `mosquitto` ↔ `roon-hub` and adds one broker round-trip.
+
+### Which path to pick
+
+| Situation | Direct `edge-agent` | MQTT |
+|---|---|---|
+| One Nuimo near one host running the Roon Core | ✓ recommended | over-engineered |
+| Nuimo on Mac, Roon Core on Linux NAS, Hue bridge on router | ✓ (run an edge-agent on Mac, one on NAS) | ✓ |
+| Latency-critical (volume twiddle) | ✓ <10 ms | 20–60 ms + broker hop |
+| Devices / services span 3+ hosts with sparse overlap | reasonable | ✓ better |
+| Zero binary installs on device host | — | ✓ (MQTT-only) |
+
+Ops detail lives in the per-repo READMEs; the canonical [`compose.yml`](./compose.yml) brings up mosquitto + roon-hub + weave-server + weave-web together. See [`CLAUDE.md`](./CLAUDE.md) for the deploy topology and the one-time volume-migration script (for anyone moving off the previous `roon-rs/compose.yml` location).
+
 ## Components in this repo
 
 | Path | What it is |
@@ -36,13 +107,13 @@ Sibling repos:
 
 ### Docker Compose (one-host smoke test)
 
-The sibling [`roon-rs`](https://github.com/shin1ohno/roon-rs) repo ships a `compose.yml` that brings up `mosquitto`, `roon-hub`, `weave-server`, and `weave-web` together:
+The [`compose.yml`](./compose.yml) in this repo brings up `mosquitto`, `roon-hub`, `weave-server`, and `weave-web` together. `roon-hub` still builds from the sibling [`roon-rs`](https://github.com/shin1ohno/roon-rs) checkout, so both repos must be cloned side-by-side:
 
 ```
 git clone git@github.com:shin1ohno/roon-rs.git
 git clone git@github.com:shin1ohno/weave.git
-cd roon-rs
-docker compose up -d
+cd weave
+docker compose up -d --build
 ```
 
 Then:
