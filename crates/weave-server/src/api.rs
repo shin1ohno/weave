@@ -123,16 +123,33 @@ async fn switch_target(
         Ok(u) => u,
         Err(_) => return StatusCode::BAD_REQUEST,
     };
-    if ctx.engine.switch_target(uuid, &body.service_target).await {
-        if let Ok(Some(mut mapping)) = ctx.store.get_mapping(&uuid).await {
-            mapping.service_target = body.service_target.clone();
-            let _ = ctx.store.update_mapping(&mapping).await;
-            push_mapping_upsert(&ctx, &mapping);
-        }
+    if apply_switch_target(&ctx, uuid, &body.service_target).await {
         StatusCode::OK
     } else {
         StatusCode::NOT_FOUND
     }
+}
+
+/// Shared target-switch path used by the REST handler (`POST
+/// /api/mappings/:id/target`) and the WS edge handler (receipt of
+/// `EdgeToServer::SwitchTarget`). Returns true if a mapping with the
+/// given id was found and its `service_target` updated; false means
+/// "nothing to do" (unknown mapping).
+pub async fn apply_switch_target(
+    ctx: &AppCtx,
+    mapping_id: uuid::Uuid,
+    service_target: &str,
+) -> bool {
+    if !ctx.engine.switch_target(mapping_id, service_target).await {
+        return false;
+    }
+    let Ok(Some(mut mapping)) = ctx.store.get_mapping(&mapping_id).await else {
+        return false;
+    };
+    mapping.service_target = service_target.to_string();
+    let _ = ctx.store.update_mapping(&mapping).await;
+    push_mapping_upsert(ctx, &mapping);
+    true
 }
 
 fn push_mapping_upsert(ctx: &AppCtx, mapping: &Mapping) {
