@@ -2,27 +2,64 @@
 
 ## Deploy topology
 
-The canonical docker-compose lives in the sibling repo `~/ManagedProjects/roon-rs/compose.yml`, not in this repo. `weave` itself only ships Dockerfiles (`crates/weave-server/Dockerfile`, `weave-web/Dockerfile`); the composition is in roon-rs because the full home-audio stack needs mosquitto + roon-hub (roon-rs code) alongside weave-server + weave-web.
+The canonical compose file is `compose.yml` **in this repo** and is self-contained — no sibling `roon-rs` checkout required. `roon-hub` is pulled from crates.io via `cargo install` inside `deploy/roon-hub/Dockerfile` and version-pinned there.
 
-**Stack composition (`roon-rs/compose.yml`):**
+**Stack composition (`compose.yml`):**
 
 | Service | Build context | Ports | Notes |
 |---|---|---|---|
 | mosquitto | `eclipse-mosquitto:2` | 1883 | MQTT broker, healthcheck-gated |
-| roon-hub | `roon-rs` | — | Depends on mosquitto |
-| weave-server | `../weave` (sibling) | 3101→3001 | `WEAVE_DISABLE_MQTT=1` by default |
-| weave-web | `../weave/weave-web` | 3100→3000 | Proxies `/api` and `/ws` to weave-server |
+| roon-hub | `.` (cargo install from crates.io) | — | Version pinned in `deploy/roon-hub/Dockerfile` |
+| weave-server | `.` (this repo) | 3101→3001 | `WEAVE_DISABLE_MQTT=1` by default |
+| weave-web | `./weave-web` | 3100→3000 | Proxies `/api` and `/ws` to weave-server |
+
+**Bumping roon-hub**: edit the `--version` line in `deploy/roon-hub/Dockerfile` and `docker compose up -d --build roon-hub`. No sibling checkout or path edits needed.
+
+Compose project name is pinned to `weave` (`name: weave` in `compose.yml`) so running `docker compose` from any directory keeps the same volume namespace.
 
 **Not in the stack**: `edge-agent` runs natively on each BLE-adjacent host (systemd/user service) because it needs host bluez/D-Bus access. Its ws target is `ws://<docker-host>:3101/ws/edge`.
 
-**Deploy command** (from `~/ManagedProjects/roon-rs`):
+**Deploy command** (from `~/ManagedProjects/weave`):
 ```
 docker compose up -d --build
 ```
 
 Browser URL: `http://<host>:3100` (not 3000 — 3000 is commonly taken locally).
 
-**When a weave change needs deploying**: both `weave-web` and `weave-server` images are built fresh from source on every `docker compose up --build`, so there's no image tag to bump — just pull the latest commit on the host that runs compose, then `up -d --build`. If a host doesn't have a `weave` checkout alongside `roon-rs`, compose will fail at build time (context is `../weave`).
+**When a weave change needs deploying**: both `weave-web` and `weave-server` images are built fresh from source on every `docker compose up --build`, so there's no image tag to bump — just pull the latest commit on the host that runs compose, then `up -d --build`. `roon-hub` is independent of this repo's version and is only rebuilt when its Dockerfile changes.
+
+### One-time migration from the old `roon-rs/compose.yml` location
+
+The compose file previously lived in `roon-rs/`, which put existing volumes under the `roon-rs_*` namespace (`roon-rs_weave-data`, `roon-rs_mosquitto-data`, …). After moving here the project name becomes `weave`, so a naïve `docker compose up` creates empty `weave_*` volumes and loses the SQLite mappings store.
+
+To migrate without data loss — **run once** on the host that holds the old volumes:
+
+```
+# 1. Stop the old stack so nothing is writing.
+cd ~/ManagedProjects/roon-rs && docker compose down
+
+# 2. Copy each volume under the new name.
+for v in weave-data mosquitto-data mosquitto-log roon-hub-data; do
+  docker volume create "weave_${v}"
+  docker run --rm \
+    -v "roon-rs_${v}:/src:ro" \
+    -v "weave_${v}:/dst" \
+    alpine sh -c "cp -a /src/. /dst/"
+done
+
+# 3. Bring up the new stack.
+cd ~/ManagedProjects/weave && docker compose up -d --build
+
+# 4. Verify. Mappings should list pre-existing entries, and edges should
+#    reconnect on their own.
+curl -s http://127.0.0.1:3101/api/mappings | python3 -m json.tool | head
+
+# 5. Once confirmed, remove the old volumes.
+docker volume rm roon-rs_weave-data roon-rs_mosquitto-data \
+  roon-rs_mosquitto-log roon-rs_roon-hub-data
+```
+
+After this migration the sibling `roon-rs/compose.yml` and `roon-rs/deploy/` can be removed in a follow-up PR to roon-rs.
 
 ## First-time Roon pairing
 
