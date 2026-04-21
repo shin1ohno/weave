@@ -177,13 +177,7 @@ mod tests {
             let lines: Vec<_> = g.pattern.lines().collect();
             assert_eq!(lines.len(), 9, "{}: wrong row count", g.name);
             for (r, line) in lines.iter().enumerate() {
-                assert_eq!(
-                    line.chars().count(),
-                    9,
-                    "{}: row {} wrong width",
-                    g.name,
-                    r
-                );
+                assert_eq!(line.chars().count(), 9, "{}: row {} wrong width", g.name, r);
             }
         }
     }

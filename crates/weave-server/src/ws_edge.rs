@@ -170,8 +170,7 @@ async fn handle_edge_text(
             mapping_id,
             service_target,
         } => {
-            let applied =
-                crate::api::apply_switch_target(ctx, mapping_id, &service_target).await;
+            let applied = crate::api::apply_switch_target(ctx, mapping_id, &service_target).await;
             tracing::info!(
                 edge_id = ?edge_id,
                 ?mapping_id,
