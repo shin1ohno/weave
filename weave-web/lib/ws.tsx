@@ -27,6 +27,14 @@ interface UIState {
   deviceStates: DeviceStateEntry[];
   mappings: Mapping[];
   glyphs: Glyph[];
+  /**
+   * Set of `mapping_id` values with an in-flight optimistic `switchTarget`
+   * call. While a mapping is in this set, incoming `mapping_changed`
+   * broadcasts for it are ignored — the local optimistic `service_target`
+   * is authoritative until the request resolves. Cleared on disconnect
+   * because no ACK will arrive.
+   */
+  pendingSwitches: Set<string>;
 }
 
 const emptyState: UIState = {
@@ -36,6 +44,7 @@ const emptyState: UIState = {
   deviceStates: [],
   mappings: [],
   glyphs: [],
+  pendingSwitches: new Set<string>(),
 };
 
 type Action =
@@ -44,7 +53,10 @@ type Action =
   | { kind: "frame"; frame: UiFrame }
   | { kind: "local_upsert_mapping"; mapping: Mapping }
   | { kind: "local_delete_mapping"; id: string }
-  | { kind: "local_upsert_glyph"; glyph: Glyph };
+  | { kind: "local_upsert_glyph"; glyph: Glyph }
+  | { kind: "local_set_mapping_target"; id: string; service_target: string }
+  | { kind: "switch_pending_start"; id: string }
+  | { kind: "switch_pending_end"; id: string };
 
 function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
   return {
@@ -54,6 +66,7 @@ function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
     deviceStates: snapshot.device_states,
     mappings: snapshot.mappings,
     glyphs: snapshot.glyphs,
+    pendingSwitches: new Set<string>(),
   };
 }
 
@@ -62,7 +75,13 @@ function reducer(state: UIState, action: Action): UIState {
     case "connected":
       return { ...state, connected: true };
     case "disconnected":
-      return { ...state, connected: false };
+      // Clear pending switches on disconnect — no ACK will come, so the
+      // optimistic state is stale and the next snapshot should win.
+      return {
+        ...state,
+        connected: false,
+        pendingSwitches: new Set<string>(),
+      };
     case "local_upsert_mapping": {
       const others = state.mappings.filter(
         (m) => m.mapping_id !== action.mapping.mapping_id
@@ -77,6 +96,29 @@ function reducer(state: UIState, action: Action): UIState {
     case "local_upsert_glyph": {
       const others = state.glyphs.filter((g) => g.name !== action.glyph.name);
       return { ...state, glyphs: [...others, action.glyph] };
+    }
+    case "local_set_mapping_target": {
+      let changed = false;
+      const mappings = state.mappings.map((m) => {
+        if (m.mapping_id !== action.id) return m;
+        if (m.service_target === action.service_target) return m;
+        changed = true;
+        return { ...m, service_target: action.service_target };
+      });
+      if (!changed) return state;
+      return { ...state, mappings };
+    }
+    case "switch_pending_start": {
+      if (state.pendingSwitches.has(action.id)) return state;
+      const next = new Set(state.pendingSwitches);
+      next.add(action.id);
+      return { ...state, pendingSwitches: next };
+    }
+    case "switch_pending_end": {
+      if (!state.pendingSwitches.has(action.id)) return state;
+      const next = new Set(state.pendingSwitches);
+      next.delete(action.id);
+      return { ...state, pendingSwitches: next };
     }
     case "frame": {
       const frame = action.frame;
@@ -143,6 +185,13 @@ function reducer(state: UIState, action: Action): UIState {
           };
         }
         case "mapping_changed": {
+          // Race guard: if a local optimistic switch is still in flight for
+          // this mapping, ignore the broadcast. The local state is
+          // authoritative until the API call resolves (which clears the
+          // pending flag), at which point subsequent broadcasts apply.
+          if (state.pendingSwitches.has(frame.mapping_id)) {
+            return state;
+          }
           if (frame.op === "delete" || !frame.mapping) {
             return {
               ...state,
@@ -271,6 +320,16 @@ export function useUIDispatch(): (action: Action) => void {
   if (!ctx)
     throw new Error("useUIDispatch must be used inside UIStateProvider");
   return ctx.dispatch;
+}
+
+/** Convenience accessor for the in-flight switch-target mapping IDs. */
+export function usePendingSwitches(): Set<string> {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error(
+      "usePendingSwitches must be used inside UIStateProvider"
+    );
+  return ctx.state.pendingSwitches;
 }
 
 /**

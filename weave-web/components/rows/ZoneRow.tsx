@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
+import { useKnownTargets } from "@/hooks/useKnownTargets";
 
 interface Props {
   target: string;
@@ -47,6 +51,17 @@ export function ZoneRow({ target, states, controllers }: Props) {
   // Deep-link edit goes to the first active controller if any.
   const primary = controllers.find((m) => m.active) ?? controllers[0];
 
+  // Precompute whether the primary controller has anywhere to switch to —
+  // either author-defined target_candidates or at least one other known
+  // zone in the live service_states. Hook must be called unconditionally.
+  const knownTargets = useKnownTargets(primary?.service_type ?? "");
+  const canSwitch =
+    !!primary &&
+    ((primary.target_candidates?.length ?? 0) > 0 ||
+      knownTargets.length > 1 ||
+      (knownTargets.length === 1 &&
+        knownTargets[0].target !== primary.service_target));
+
   return (
     <div className="rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
       <div className="flex flex-wrap items-center gap-3">
@@ -64,6 +79,7 @@ export function ZoneRow({ target, states, controllers }: Props) {
           {vol && typeof vol.value === "number" && (
             <VolumeIndicator vol={vol} />
           )}
+          {primary && canSwitch && <SwitchTargetPopover mapping={primary} />}
           {primary && (
             <Link
               href={`/mappings/${primary.mapping_id}/edit`}

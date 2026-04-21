@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useUIState } from "@/lib/ws";
+import { useSuggestValues } from "@/hooks/useSuggestValues";
 import { GlyphPicker } from "./GlyphPicker";
 import type { FeedbackRule, Glyph } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -43,22 +44,6 @@ export function FeedbackSection({
     return Array.from(set).sort();
   }, [state.serviceStates, serviceType, serviceTarget]);
 
-  const suggestValuesFor = (property: string): string[] => {
-    const values = new Set<string>();
-    for (const s of state.serviceStates) {
-      if (
-        s.service_type !== serviceType ||
-        s.target !== serviceTarget ||
-        s.property !== property
-      )
-        continue;
-      if (typeof s.value === "string") values.add(s.value);
-      else if (typeof s.value === "number" || typeof s.value === "boolean")
-        values.add(String(s.value));
-    }
-    return Array.from(values).sort();
-  };
-
   const updateRule = (i: number, next: FeedbackRule) => {
     const arr = [...feedback];
     arr[i] = next;
@@ -91,9 +76,10 @@ export function FeedbackSection({
         <FeedbackRuleRow
           key={i}
           rule={rule}
+          serviceType={serviceType}
+          serviceTarget={serviceTarget}
           knownProperties={knownProperties}
           glyphsFull={state.glyphs}
-          suggestValuesFor={suggestValuesFor}
           onChange={(next) => updateRule(i, next)}
           onRemove={() => removeRule(i)}
         />
@@ -104,18 +90,20 @@ export function FeedbackSection({
 
 interface RuleRowProps {
   rule: FeedbackRule;
+  serviceType: string;
+  serviceTarget: string;
   knownProperties: string[];
   glyphsFull: Glyph[];
-  suggestValuesFor: (property: string) => string[];
   onChange: (next: FeedbackRule) => void;
   onRemove: () => void;
 }
 
 function FeedbackRuleRow({
   rule,
+  serviceType,
+  serviceTarget,
   knownProperties,
   glyphsFull,
-  suggestValuesFor,
   onChange,
   onRemove,
 }: RuleRowProps) {
@@ -155,7 +143,11 @@ function FeedbackRuleRow({
   const addEntry = () =>
     commit([...entries, ["", ""]]);
 
-  const valueSuggestions = rule.state ? suggestValuesFor(rule.state) : [];
+  const valueSuggestions = useSuggestValues(
+    serviceType,
+    serviceTarget,
+    rule.state
+  );
 
   return (
     <div className="space-y-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10">
