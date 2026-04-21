@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   ReactNode,
@@ -26,6 +27,14 @@ interface UIState {
   deviceStates: DeviceStateEntry[];
   mappings: Mapping[];
   glyphs: Glyph[];
+  /**
+   * Set of `mapping_id` values with an in-flight optimistic `switchTarget`
+   * call. While a mapping is in this set, incoming `mapping_changed`
+   * broadcasts for it are ignored — the local optimistic `service_target`
+   * is authoritative until the request resolves. Cleared on disconnect
+   * because no ACK will arrive.
+   */
+  pendingSwitches: Set<string>;
 }
 
 const emptyState: UIState = {
@@ -35,6 +44,7 @@ const emptyState: UIState = {
   deviceStates: [],
   mappings: [],
   glyphs: [],
+  pendingSwitches: new Set<string>(),
 };
 
 type Action =
@@ -43,7 +53,10 @@ type Action =
   | { kind: "frame"; frame: UiFrame }
   | { kind: "local_upsert_mapping"; mapping: Mapping }
   | { kind: "local_delete_mapping"; id: string }
-  | { kind: "local_upsert_glyph"; glyph: Glyph };
+  | { kind: "local_upsert_glyph"; glyph: Glyph }
+  | { kind: "local_set_mapping_target"; id: string; service_target: string }
+  | { kind: "switch_pending_start"; id: string }
+  | { kind: "switch_pending_end"; id: string };
 
 function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
   return {
@@ -53,6 +66,7 @@ function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
     deviceStates: snapshot.device_states,
     mappings: snapshot.mappings,
     glyphs: snapshot.glyphs,
+    pendingSwitches: new Set<string>(),
   };
 }
 
@@ -61,7 +75,13 @@ function reducer(state: UIState, action: Action): UIState {
     case "connected":
       return { ...state, connected: true };
     case "disconnected":
-      return { ...state, connected: false };
+      // Clear pending switches on disconnect — no ACK will come, so the
+      // optimistic state is stale and the next snapshot should win.
+      return {
+        ...state,
+        connected: false,
+        pendingSwitches: new Set<string>(),
+      };
     case "local_upsert_mapping": {
       const others = state.mappings.filter(
         (m) => m.mapping_id !== action.mapping.mapping_id
@@ -76,6 +96,29 @@ function reducer(state: UIState, action: Action): UIState {
     case "local_upsert_glyph": {
       const others = state.glyphs.filter((g) => g.name !== action.glyph.name);
       return { ...state, glyphs: [...others, action.glyph] };
+    }
+    case "local_set_mapping_target": {
+      let changed = false;
+      const mappings = state.mappings.map((m) => {
+        if (m.mapping_id !== action.id) return m;
+        if (m.service_target === action.service_target) return m;
+        changed = true;
+        return { ...m, service_target: action.service_target };
+      });
+      if (!changed) return state;
+      return { ...state, mappings };
+    }
+    case "switch_pending_start": {
+      if (state.pendingSwitches.has(action.id)) return state;
+      const next = new Set(state.pendingSwitches);
+      next.add(action.id);
+      return { ...state, pendingSwitches: next };
+    }
+    case "switch_pending_end": {
+      if (!state.pendingSwitches.has(action.id)) return state;
+      const next = new Set(state.pendingSwitches);
+      next.delete(action.id);
+      return { ...state, pendingSwitches: next };
     }
     case "frame": {
       const frame = action.frame;
@@ -142,6 +185,13 @@ function reducer(state: UIState, action: Action): UIState {
           };
         }
         case "mapping_changed": {
+          // Race guard: if a local optimistic switch is still in flight for
+          // this mapping, ignore the broadcast. The local state is
+          // authoritative until the API call resolves (which clears the
+          // pending flag), at which point subsequent broadcasts apply.
+          if (state.pendingSwitches.has(frame.mapping_id)) {
+            return state;
+          }
           if (frame.op === "delete" || !frame.mapping) {
             return {
               ...state,
@@ -173,10 +223,24 @@ interface UIStateContextValue {
 
 const UIStateContext = createContext<UIStateContextValue | null>(null);
 
+/**
+ * Fan-out registry for raw WS frames. Listeners are stored in a ref owned by
+ * `UIStateProvider` and invoked inside `ws.onmessage` *after* the reducer
+ * dispatch. This lets `RecentEventsProvider` (and future subscribers)
+ * consume every incoming frame without being colocated with the reducer
+ * state — keeping them out of `useUIState`'s re-render graph.
+ */
+type FrameListener = (frame: UiFrame) => void;
+
+const WsListenersContext = createContext<{
+  add: (fn: FrameListener) => () => void;
+} | null>(null);
+
 export function UIStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, emptyState);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelay = useRef<number>(1000);
+  const listenersRef = useRef<Set<FrameListener>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +258,13 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
         try {
           const frame = JSON.parse(ev.data) as UiFrame;
           dispatch({ kind: "frame", frame });
+          for (const fn of listenersRef.current) {
+            try {
+              fn(frame);
+            } catch (err) {
+              console.warn("ws frame listener threw", err);
+            }
+          }
         } catch (e) {
           console.warn("bad ws payload", e);
         }
@@ -217,9 +288,23 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const listenersApi = useMemo(
+    () => ({
+      add: (fn: FrameListener) => {
+        listenersRef.current.add(fn);
+        return () => {
+          listenersRef.current.delete(fn);
+        };
+      },
+    }),
+    []
+  );
+
   return (
     <UIStateContext.Provider value={{ state, dispatch }}>
-      {children}
+      <WsListenersContext.Provider value={listenersApi}>
+        {children}
+      </WsListenersContext.Provider>
     </UIStateContext.Provider>
   );
 }
@@ -235,4 +320,33 @@ export function useUIDispatch(): (action: Action) => void {
   if (!ctx)
     throw new Error("useUIDispatch must be used inside UIStateProvider");
   return ctx.dispatch;
+}
+
+/** Convenience accessor for the in-flight switch-target mapping IDs. */
+export function usePendingSwitches(): Set<string> {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error(
+      "usePendingSwitches must be used inside UIStateProvider"
+    );
+  return ctx.state.pendingSwitches;
+}
+
+/**
+ * Subscribe to every incoming WS frame. The listener is registered once per
+ * mount and unsubscribed on cleanup. Safe to call from any descendant of
+ * `UIStateProvider`. Unlike `useUIState`, this does NOT cause the caller to
+ * re-render when state changes — it's a pure side-channel.
+ */
+export function useWsFrames(listener: FrameListener): void {
+  const ctx = useContext(WsListenersContext);
+  if (!ctx)
+    throw new Error("useWsFrames must be used inside UIStateProvider");
+  const ref = useRef(listener);
+  useEffect(() => {
+    ref.current = listener;
+  }, [listener]);
+  useEffect(() => {
+    return ctx.add((frame) => ref.current(frame));
+  }, [ctx]);
 }

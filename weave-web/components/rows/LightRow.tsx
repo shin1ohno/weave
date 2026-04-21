@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
+import { useKnownTargets } from "@/hooks/useKnownTargets";
 import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
@@ -30,6 +32,14 @@ export function LightRow({ target, entry, controllers }: Props) {
     id: `light:hue:${target}`,
     primaryMappingId: primary?.mapping_id,
   });
+
+  const knownTargets = useKnownTargets(primary?.service_type ?? "");
+  const canSwitch =
+    !!primary &&
+    ((primary.target_candidates?.length ?? 0) > 0 ||
+      knownTargets.length > 1 ||
+      (knownTargets.length === 1 &&
+        knownTargets[0].target !== primary.service_target));
 
   return (
     <div
@@ -61,6 +71,7 @@ export function LightRow({ target, entry, controllers }: Props) {
               </div>
             </div>
           )}
+          {primary && canSwitch && <SwitchTargetPopover mapping={primary} />}
           {primary && (
             <Link
               href={`/mappings/${primary.mapping_id}/edit`}

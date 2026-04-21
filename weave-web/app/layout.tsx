@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { UIStateProvider } from "@/lib/ws";
+import { RecentEventsProvider } from "@/lib/recent-events";
 import { AppShell } from "@/components/AppShell";
 import { CommandPalette } from "@/components/CommandPalette";
 import { HelpOverlay } from "@/components/HelpOverlay";
@@ -38,15 +39,17 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <UIStateProvider>
-          <CommandUIProvider>
-            <RowSelectionProvider>
-              <AppShell>{children}</AppShell>
-              {drawer}
-              <KeyboardBindings />
-              <CommandPalette />
-              <HelpOverlay />
-            </RowSelectionProvider>
-          </CommandUIProvider>
+          <RecentEventsProvider>
+            <CommandUIProvider>
+              <RowSelectionProvider>
+                <AppShell>{children}</AppShell>
+                {drawer}
+                <KeyboardBindings />
+                <CommandPalette />
+                <HelpOverlay />
+              </RowSelectionProvider>
+            </CommandUIProvider>
+          </RecentEventsProvider>
         </UIStateProvider>
       </body>
     </html>
