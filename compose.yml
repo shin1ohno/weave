@@ -13,12 +13,11 @@
 # access for BLE. Run it natively (systemd/user service) on the host that's
 # physically near the Nuimo.
 #
-# Layout: this compose file is the single source of truth for the home stack.
-# It assumes the sibling `roon-rs` repo is checked out alongside this one so
-# roon-hub can be built from source:
-#
-#   ~/ManagedProjects/weave      ← this repo (compose.yml, weave-server, weave-web)
-#   ~/ManagedProjects/roon-rs    ← sibling (roon-hub Dockerfile)
+# Layout: this compose file is the single source of truth for the home
+# stack. It is self-contained — no sibling repo checkout is required.
+# `roon-hub` is pulled from crates.io via `cargo install` inside its
+# Dockerfile (see deploy/roon-hub/Dockerfile), pinned to a specific
+# version. `weave-server` and `weave-web` build from source in this repo.
 #
 # Usage:
 #   docker compose up -d
@@ -54,8 +53,8 @@ services:
 
   roon-hub:
     build:
-      context: ../roon-rs
-      dockerfile: crates/roon-hub/Dockerfile
+      context: .
+      dockerfile: deploy/roon-hub/Dockerfile
     container_name: roon-hub
     restart: unless-stopped
     depends_on:

@@ -51,7 +51,7 @@ Physical devices                 Edges (one per host)                  Control p
 | [**shin1ohno/weave**](https://github.com/shin1ohno/weave) (this) | `weave-engine`, `weave-server`, `weave-web` | crates.io (server, engine) + Docker image (web). The control plane. |
 | [**shin1ohno/edge-agent**](https://github.com/shin1ohno/edge-agent) | `weave-contracts`, `edge-agent` | crates.io. Per-host binary + WS protocol types shared with `weave-server`. |
 | [**shin1ohno/nuimo-rs**](https://github.com/shin1ohno/nuimo-rs) | `nuimo`, `nuimo-mqtt` | crates.io. Nuimo BLE SDK (used by `edge-agent`) + optional MQTT bridge. |
-| [**shin1ohno/roon-rs**](https://github.com/shin1ohno/roon-rs) | `roon-api`, `roon-cli`, `roon-mcp`, `roon-hub` | crates.io + Docker Hub. Roon SOOD/MOO SDK (used by `edge-agent`) + `roon-hub` MQTT bridge. Also owns the canonical `compose.yml`. |
+| [**shin1ohno/roon-rs**](https://github.com/shin1ohno/roon-rs) | `roon-api`, `roon-cli`, `roon-mcp`, `roon-hub` | crates.io. Roon SOOD/MOO SDK (used by `edge-agent`) + `roon-hub` MQTT bridge (pulled via `cargo install` from this repo's compose). |
 
 ### End-to-end: one Nuimo rotate tick (direct path)
 
@@ -107,10 +107,9 @@ Sibling repos:
 
 ### Docker Compose (one-host smoke test)
 
-The [`compose.yml`](./compose.yml) in this repo brings up `mosquitto`, `roon-hub`, `weave-server`, and `weave-web` together. `roon-hub` still builds from the sibling [`roon-rs`](https://github.com/shin1ohno/roon-rs) checkout, so both repos must be cloned side-by-side:
+The [`compose.yml`](./compose.yml) in this repo brings up `mosquitto`, `roon-hub`, `weave-server`, and `weave-web` together. It's self-contained — `roon-hub` is installed from crates.io inside its Dockerfile, so no sibling repo checkout is required:
 
 ```
-git clone git@github.com:shin1ohno/roon-rs.git
 git clone git@github.com:shin1ohno/weave.git
 cd weave
 docker compose up -d --build

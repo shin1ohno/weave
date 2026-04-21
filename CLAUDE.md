@@ -2,21 +2,18 @@
 
 ## Deploy topology
 
-The canonical compose file is `compose.yml` **in this repo**. roon-rs is a sibling checkout only because roon-hub still builds from source there:
-
-```
-~/ManagedProjects/weave      ← this repo, compose.yml lives here
-~/ManagedProjects/roon-rs    ← sibling, roon-hub Dockerfile lives here
-```
+The canonical compose file is `compose.yml` **in this repo** and is self-contained — no sibling `roon-rs` checkout required. `roon-hub` is pulled from crates.io via `cargo install` inside `deploy/roon-hub/Dockerfile` and version-pinned there.
 
 **Stack composition (`compose.yml`):**
 
 | Service | Build context | Ports | Notes |
 |---|---|---|---|
 | mosquitto | `eclipse-mosquitto:2` | 1883 | MQTT broker, healthcheck-gated |
-| roon-hub | `../roon-rs` (sibling) | — | Depends on mosquitto |
+| roon-hub | `.` (cargo install from crates.io) | — | Version pinned in `deploy/roon-hub/Dockerfile` |
 | weave-server | `.` (this repo) | 3101→3001 | `WEAVE_DISABLE_MQTT=1` by default |
 | weave-web | `./weave-web` | 3100→3000 | Proxies `/api` and `/ws` to weave-server |
+
+**Bumping roon-hub**: edit the `--version` line in `deploy/roon-hub/Dockerfile` and `docker compose up -d --build roon-hub`. No sibling checkout or path edits needed.
 
 Compose project name is pinned to `weave` (`name: weave` in `compose.yml`) so running `docker compose` from any directory keeps the same volume namespace.
 
@@ -29,7 +26,7 @@ docker compose up -d --build
 
 Browser URL: `http://<host>:3100` (not 3000 — 3000 is commonly taken locally).
 
-**When a weave change needs deploying**: both `weave-web` and `weave-server` images are built fresh from source on every `docker compose up --build`, so there's no image tag to bump — just pull the latest commit on the host that runs compose, then `up -d --build`. If a host doesn't have a `roon-rs` checkout alongside `weave`, compose will fail at build time (roon-hub's context is `../roon-rs`).
+**When a weave change needs deploying**: both `weave-web` and `weave-server` images are built fresh from source on every `docker compose up --build`, so there's no image tag to bump — just pull the latest commit on the host that runs compose, then `up -d --build`. `roon-hub` is independent of this repo's version and is only rebuilt when its Dockerfile changes.
 
 ### One-time migration from the old `roon-rs/compose.yml` location
 
