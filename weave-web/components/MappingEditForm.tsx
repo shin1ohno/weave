@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
 import {
+  createMapping,
   getMapping,
   updateMapping,
   type FeedbackRule,
@@ -19,9 +19,9 @@ import { Select } from "@/components/ui/select";
 import { Checkbox, CheckboxField } from "@/components/ui/checkbox";
 import { Field, Label } from "@/components/ui/fieldset";
 import { Heading, Subheading } from "@/components/ui/heading";
-import { Text, TextLink } from "@/components/ui/text";
+import { Text } from "@/components/ui/text";
 
-const INPUT_TYPES = [
+export const INPUT_TYPES = [
   "rotate",
   "press",
   "release",
@@ -39,7 +39,7 @@ const INPUT_TYPES = [
   "key_press",
 ];
 
-const INTENT_TYPES = [
+export const INTENT_TYPES = [
   "play",
   "pause",
   "play_pause",
@@ -59,32 +59,55 @@ const INTENT_TYPES = [
   "power_off",
 ];
 
-export default function EditMapping() {
-  const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
+const DEFAULT_NEW_ROUTES: Route[] = [
+  { input: "rotate", intent: "volume_change", params: { damping: 80 } },
+  { input: "press", intent: "play_pause" },
+  { input: "swipe_right", intent: "next" },
+  { input: "swipe_left", intent: "previous" },
+];
+
+type Mode = { kind: "new" } | { kind: "edit"; mappingId: string };
+
+interface Props {
+  mode: Mode;
+  /** Called after a successful save. The host decides whether to close the
+   *  drawer (`router.back()`) or navigate away (`router.push("/")`). */
+  onSaved: () => void;
+  /** Heading string. Defaults: "New mapping" / "Edit mapping". */
+  title?: string;
+  /** Optional cancel handler. If provided, renders a Cancel button next to Save. */
+  onCancel?: () => void;
+}
+
+export function MappingEditForm({ mode, onSaved, title, onCancel }: Props) {
   const state = useUIState();
   const dispatch = useUIDispatch();
 
-  const fromLive = useMemo(
-    () => state.mappings.find((m) => m.mapping_id === id) ?? null,
-    [state.mappings, id]
+  const [mapping, setMapping] = useState<Mapping | null>(() =>
+    mode.kind === "new" ? newMappingDraft() : null
   );
-  const [mapping, setMapping] = useState<Mapping | null>(fromLive);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit mode: prefer live state, fall back to REST.
   useEffect(() => {
+    if (mode.kind !== "edit") return;
+    const fromLive = state.mappings.find(
+      (m) => m.mapping_id === mode.mappingId
+    );
     if (fromLive) {
       setMapping(fromLive);
       return;
     }
-    getMapping(id).then(setMapping).catch((e) => setError(e.message));
-  }, [id, fromLive]);
+    getMapping(mode.mappingId)
+      .then(setMapping)
+      .catch((e) => setError((e as Error).message));
+  }, [mode, state.mappings]);
 
   const knownTargets = useMemo(() => {
     if (!mapping) return [];
-    const metaProperty = mapping.service_type === "hue" ? "light" : "zone";
+    const metaProperty =
+      mapping.service_type === "hue" ? "light" : "zone";
     return state.serviceStates
       .filter(
         (s) =>
@@ -100,7 +123,20 @@ export default function EditMapping() {
       .filter((v, i, a) => a.findIndex((x) => x.target === v.target) === i);
   }, [state.serviceStates, mapping]);
 
-  if (error) return <Text className="text-red-600">{error}</Text>;
+  const knownEdges = useMemo(
+    () => state.edges.map((e) => e.edge_id).sort(),
+    [state.edges]
+  );
+  const knownDevices = useMemo(() => {
+    if (!mapping) return [];
+    return state.deviceStates
+      .filter((d) => d.device_type === mapping.device_type)
+      .map((d) => d.device_id)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort();
+  }, [state.deviceStates, mapping]);
+
+  if (error && !mapping) return <Text className="text-red-600">{error}</Text>;
   if (!mapping) return <Text>Loading…</Text>;
 
   const updateField = <K extends keyof Mapping>(key: K, value: Mapping[K]) => {
@@ -128,10 +164,26 @@ export default function EditMapping() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    dispatch({ kind: "local_upsert_mapping", mapping });
     try {
-      await updateMapping(id, mapping);
-      router.push("/mappings");
+      if (mode.kind === "edit") {
+        dispatch({ kind: "local_upsert_mapping", mapping });
+        await updateMapping(mode.mappingId, mapping);
+      } else {
+        const created = await createMapping({
+          edge_id: mapping.edge_id,
+          device_type: mapping.device_type,
+          device_id: mapping.device_id,
+          service_type: mapping.service_type,
+          service_target: mapping.service_target,
+          routes: mapping.routes,
+          feedback: mapping.feedback,
+          active: mapping.active,
+          target_candidates: mapping.target_candidates,
+          target_switch_on: mapping.target_switch_on,
+        });
+        dispatch({ kind: "local_upsert_mapping", mapping: created });
+      }
+      onSaved();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -141,10 +193,7 @@ export default function EditMapping() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Heading>Edit mapping</Heading>
-        <TextLink href="/mappings">← Back</TextLink>
-      </div>
+      <Heading>{title ?? (mode.kind === "edit" ? "Edit mapping" : "New mapping")}</Heading>
 
       {error && (
         <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
@@ -159,11 +208,12 @@ export default function EditMapping() {
             <Input
               value={mapping.edge_id}
               onChange={(e) => updateField("edge_id", e.target.value)}
-              list="edge-ids"
+              list="mapping-edges"
+              placeholder="living-room"
             />
-            <datalist id="edge-ids">
-              {state.edges.map((e) => (
-                <option key={e.edge_id} value={e.edge_id} />
+            <datalist id="mapping-edges">
+              {knownEdges.map((id) => (
+                <option key={id} value={id} />
               ))}
             </datalist>
           </Field>
@@ -186,7 +236,14 @@ export default function EditMapping() {
             <Input
               value={mapping.device_id}
               onChange={(e) => updateField("device_id", e.target.value)}
+              list="mapping-devices"
+              placeholder="C3:81:DF:4E:FF:6A"
             />
+            <datalist id="mapping-devices">
+              {knownDevices.map((id) => (
+                <option key={id} value={id} />
+              ))}
+            </datalist>
           </Field>
           <Field>
             <Label>Service Type</Label>
@@ -271,6 +328,7 @@ export default function EditMapping() {
                     params: { damping: Number(e.target.value) },
                   })
                 }
+                title="Damping factor"
               />
             </div>
             <Button
@@ -307,9 +365,30 @@ export default function EditMapping() {
 
       <div className="flex gap-3">
         <Button onClick={handleSave} disabled={saving} color="blue">
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : mode.kind === "edit" ? "Save" : "Create mapping"}
         </Button>
+        {onCancel && (
+          <Button type="button" outline onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );
+}
+
+function newMappingDraft(): Mapping {
+  return {
+    mapping_id: "",
+    edge_id: "",
+    device_type: "nuimo",
+    device_id: "",
+    service_type: "roon",
+    service_target: "",
+    routes: DEFAULT_NEW_ROUTES,
+    feedback: [],
+    active: true,
+    target_candidates: [],
+    target_switch_on: null,
+  };
 }

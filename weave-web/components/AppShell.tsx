@@ -1,49 +1,32 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import {
-  Navbar,
-  NavbarItem,
-  NavbarLabel,
-  NavbarSection,
-  NavbarSpacer,
-} from "@/components/ui/navbar";
-
-const NAV = [
-  { href: "/", label: "Overview" },
-  { href: "/mappings", label: "Mappings" },
-  { href: "/glyphs", label: "Glyphs" },
-  { href: "/edges", label: "Edges" },
-];
+import Link from "next/link";
+import { useUIState } from "@/lib/ws";
+import { Badge } from "@/components/ui/badge";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isCurrent = (href: string) =>
-    href === "/" ? pathname === "/" : pathname?.startsWith(href) ?? false;
+  const { connected } = useUIState();
 
   return (
     <>
       <header className="border-b border-zinc-950/5 bg-white px-6 dark:border-white/10 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-6xl items-center">
-          <Navbar>
-            <NavbarItem href="/">
-              <NavbarLabel className="text-lg font-semibold">
-                weave
-              </NavbarLabel>
-            </NavbarItem>
-            <NavbarSpacer />
-            <NavbarSection>
-              {NAV.map((n) => (
-                <NavbarItem
-                  key={n.href}
-                  href={n.href}
-                  current={isCurrent(n.href)}
-                >
-                  {n.label}
-                </NavbarItem>
-              ))}
-            </NavbarSection>
-          </Navbar>
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4">
+          <Link
+            href="/"
+            className="text-lg font-semibold text-zinc-950 dark:text-white"
+          >
+            weave
+          </Link>
+          <div className="ml-auto">
+            <Badge color={connected ? "green" : "zinc"}>
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  connected ? "bg-green-500" : "bg-zinc-400"
+                }`}
+              />
+              {connected ? "live" : "disconnected"}
+            </Badge>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

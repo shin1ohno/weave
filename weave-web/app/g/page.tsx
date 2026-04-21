@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Heading } from "@/components/ui/heading";
 import { Badge } from "@/components/ui/badge";
+import { TextLink } from "@/components/ui/text";
 
 export default function GlyphsList() {
   const state = useUIState();
@@ -34,7 +35,7 @@ export default function GlyphsList() {
     dispatch({ kind: "local_upsert_glyph", glyph });
     try {
       await putGlyph(glyph);
-      router.push(`/glyphs/${encodeURIComponent(glyph.name)}`);
+      router.push(`/g/${encodeURIComponent(glyph.name)}`);
     } catch (e) {
       alert(`Create failed: ${(e as Error).message}`);
     } finally {
@@ -44,7 +45,10 @@ export default function GlyphsList() {
 
   return (
     <div className="space-y-6">
-      <Heading>Glyphs</Heading>
+      <div className="flex items-center justify-between">
+        <Heading>Glyphs</Heading>
+        <TextLink href="/">← Back</TextLink>
+      </div>
 
       <form onSubmit={handleCreate} className="flex gap-2">
         <div className="flex-1">
@@ -63,7 +67,7 @@ export default function GlyphsList() {
         {sorted.map((g) => (
           <Link
             key={g.name}
-            href={`/glyphs/${encodeURIComponent(g.name)}`}
+            href={`/g/${encodeURIComponent(g.name)}`}
             className="rounded-lg border border-zinc-950/5 bg-white p-4 shadow-sm hover:border-blue-400 dark:border-white/10 dark:bg-zinc-900 dark:hover:border-blue-500"
           >
             <div className="flex items-center justify-between gap-2">
