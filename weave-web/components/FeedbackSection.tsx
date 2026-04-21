@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useUIState } from "@/lib/ws";
-import { GlyphPreview } from "./GlyphPreview";
+import { GlyphPicker } from "./GlyphPicker";
 import type { FeedbackRule, Glyph } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,16 +42,6 @@ export function FeedbackSection({
     }
     return Array.from(set).sort();
   }, [state.serviceStates, serviceType, serviceTarget]);
-
-  const glyphNames = useMemo(
-    () => state.glyphs.map((g) => g.name).sort(),
-    [state.glyphs]
-  );
-  const glyphsByName = useMemo(() => {
-    const m = new Map<string, Glyph>();
-    for (const g of state.glyphs) m.set(g.name, g);
-    return m;
-  }, [state.glyphs]);
 
   const suggestValuesFor = (property: string): string[] => {
     const values = new Set<string>();
@@ -102,8 +92,7 @@ export function FeedbackSection({
           key={i}
           rule={rule}
           knownProperties={knownProperties}
-          glyphNames={glyphNames}
-          glyphsByName={glyphsByName}
+          glyphsFull={state.glyphs}
           suggestValuesFor={suggestValuesFor}
           onChange={(next) => updateRule(i, next)}
           onRemove={() => removeRule(i)}
@@ -116,8 +105,7 @@ export function FeedbackSection({
 interface RuleRowProps {
   rule: FeedbackRule;
   knownProperties: string[];
-  glyphNames: string[];
-  glyphsByName: Map<string, Glyph>;
+  glyphsFull: Glyph[];
   suggestValuesFor: (property: string) => string[];
   onChange: (next: FeedbackRule) => void;
   onRemove: () => void;
@@ -126,8 +114,7 @@ interface RuleRowProps {
 function FeedbackRuleRow({
   rule,
   knownProperties,
-  glyphNames,
-  glyphsByName,
+  glyphsFull,
   suggestValuesFor,
   onChange,
   onRemove,
@@ -166,7 +153,7 @@ function FeedbackRuleRow({
   const removeEntry = (idx: number) =>
     commit(entries.filter((_, i) => i !== idx));
   const addEntry = () =>
-    commit([...entries, ["", glyphNames[0] ?? ""]]);
+    commit([...entries, ["", ""]]);
 
   const valueSuggestions = rule.state ? suggestValuesFor(rule.state) : [];
 
@@ -220,9 +207,6 @@ function FeedbackRuleRow({
           <Text className="text-xs">No value → glyph pairs yet.</Text>
         )}
         {entries.map(([value, glyphName], idx) => {
-          const glyph = glyphsByName.get(glyphName);
-          const selectHasName =
-            glyphName === "" || glyphNames.includes(glyphName);
           return (
             <div key={idx} className="flex flex-wrap items-center gap-2">
               <div className="w-36">
@@ -245,29 +229,11 @@ function FeedbackRuleRow({
                 </datalist>
               )}
               <span className="text-zinc-400">→</span>
-              <div className="min-w-40">
-                <Select
-                  value={glyphName}
-                  onChange={(e) => setEntryGlyph(idx, e.target.value)}
-                >
-                  {!selectHasName && (
-                    <option value={glyphName}>{glyphName} (unknown)</option>
-                  )}
-                  <option value="">— pick glyph —</option>
-                  {glyphNames.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              {glyph && (
-                <GlyphPreview
-                  pattern={glyph.pattern}
-                  glyph={glyph}
-                  size={32}
-                />
-              )}
+              <GlyphPicker
+                value={glyphName}
+                onChange={(v) => setEntryGlyph(idx, v)}
+                glyphs={glyphsFull}
+              />
               <Button
                 type="button"
                 plain

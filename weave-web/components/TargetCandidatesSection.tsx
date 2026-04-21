@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useUIState } from "@/lib/ws";
-import { GlyphPreview } from "./GlyphPreview";
-import type { Glyph, TargetCandidate } from "@/lib/api";
+import { GlyphPicker } from "./GlyphPicker";
+import type { TargetCandidate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -74,16 +74,6 @@ export function TargetCandidatesSection({
   const labelFor = (target: string) =>
     knownTargets.find((t) => t.target === target)?.label ?? "";
 
-  const glyphNames = useMemo(
-    () => state.glyphs.map((g) => g.name).sort(),
-    [state.glyphs]
-  );
-  const glyphsByName = useMemo(() => {
-    const m = new Map<string, Glyph>();
-    for (const g of state.glyphs) m.set(g.name, g);
-    return m;
-  }, [state.glyphs]);
-
   const setField = (
     i: number,
     field: keyof TargetCandidate,
@@ -112,8 +102,7 @@ export function TargetCandidatesSection({
     // can quickly add the already-active target to the rotation.
     const target = candidates.length === 0 ? serviceTarget : "";
     const label = target ? labelFor(target) : "";
-    const glyph = glyphNames[0] ?? "";
-    onCandidatesChange([...candidates, { target, label, glyph }]);
+    onCandidatesChange([...candidates, { target, label, glyph: "" }]);
   };
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -159,8 +148,6 @@ export function TargetCandidatesSection({
         </Text>
       )}
       {candidates.map((c, i) => {
-        const glyph = glyphsByName.get(c.glyph);
-        const selectHasGlyph = c.glyph === "" || glyphNames.includes(c.glyph);
         return (
           <div
             key={i}
@@ -198,25 +185,11 @@ export function TargetCandidatesSection({
                 placeholder="label"
               />
             </div>
-            <div className="min-w-40">
-              <Select
-                value={c.glyph}
-                onChange={(e) => setField(i, "glyph", e.target.value)}
-              >
-                {!selectHasGlyph && (
-                  <option value={c.glyph}>{c.glyph} (unknown)</option>
-                )}
-                <option value="">— pick glyph —</option>
-                {glyphNames.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            {glyph && (
-              <GlyphPreview pattern={glyph.pattern} glyph={glyph} size={32} />
-            )}
+            <GlyphPicker
+              value={c.glyph}
+              onChange={(v) => setField(i, "glyph", v)}
+              glyphs={state.glyphs}
+            />
             <Button
               type="button"
               plain
