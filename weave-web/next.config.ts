@@ -7,6 +7,9 @@ const UPSTREAM = process.env.WEAVE_SERVER_UPSTREAM || "http://weave-server:3001"
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Dev-only: let the dev server's HMR socket accept requests from the
+  // machine's LAN hostname in addition to localhost. Ignored in production.
+  allowedDevOrigins: ["pro.home.local", "pro.local"],
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${UPSTREAM}/api/:path*` },
