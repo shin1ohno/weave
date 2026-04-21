@@ -35,7 +35,9 @@ export default function GlyphEditPage() {
       setGlyph(fromLive);
       return;
     }
-    getGlyph(name).then(setGlyph).catch((e) => setError(e.message));
+    getGlyph(name)
+      .then(setGlyph)
+      .catch((e) => setError(e.message));
   }, [name, fromLive]);
 
   if (error) return <Text className="text-red-600">{error}</Text>;
@@ -47,7 +49,7 @@ export default function GlyphEditPage() {
     dispatch({ kind: "local_upsert_glyph", glyph });
     try {
       await putGlyph(glyph);
-      router.push("/glyphs");
+      router.push("/g");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -59,7 +61,7 @@ export default function GlyphEditPage() {
     if (!confirm(`Delete glyph "${name}"?`)) return;
     try {
       await deleteGlyph(name);
-      router.push("/glyphs");
+      router.push("/g");
     } catch (e) {
       alert(`Delete failed: ${(e as Error).message}`);
     }
@@ -69,7 +71,7 @@ export default function GlyphEditPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <Heading>{glyph.name}</Heading>
-        <TextLink href="/glyphs">← Back</TextLink>
+        <TextLink href="/g">← Back</TextLink>
       </div>
 
       {error && (

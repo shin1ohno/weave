@@ -13,6 +13,21 @@ const nextConfig: NextConfig = {
       { source: "/ws/:path*", destination: `${UPSTREAM}/ws/:path*` },
     ];
   },
+  async redirects() {
+    // Live Console absorbed the former Overview / Mappings / Edges pages.
+    // Old glyph URLs now live under /g. Keep bookmarks alive with 301s.
+    return [
+      { source: "/edges", destination: "/", permanent: true },
+      { source: "/mappings", destination: "/", permanent: true },
+      {
+        source: "/mappings/:id",
+        destination: "/mappings/:id/edit",
+        permanent: true,
+      },
+      { source: "/glyphs", destination: "/g", permanent: true },
+      { source: "/glyphs/:name", destination: "/g/:name", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

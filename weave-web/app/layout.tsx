@@ -21,8 +21,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  drawer,
 }: Readonly<{
   children: React.ReactNode;
+  drawer: React.ReactNode;
 }>) {
   return (
     <html
@@ -32,6 +34,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <UIStateProvider>
           <AppShell>{children}</AppShell>
+          {drawer}
         </UIStateProvider>
       </body>
     </html>
