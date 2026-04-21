@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   ReactNode,
@@ -222,10 +223,24 @@ interface UIStateContextValue {
 
 const UIStateContext = createContext<UIStateContextValue | null>(null);
 
+/**
+ * Fan-out registry for raw WS frames. Listeners are stored in a ref owned by
+ * `UIStateProvider` and invoked inside `ws.onmessage` *after* the reducer
+ * dispatch. This lets `RecentEventsProvider` (and future subscribers)
+ * consume every incoming frame without being colocated with the reducer
+ * state — keeping them out of `useUIState`'s re-render graph.
+ */
+type FrameListener = (frame: UiFrame) => void;
+
+const WsListenersContext = createContext<{
+  add: (fn: FrameListener) => () => void;
+} | null>(null);
+
 export function UIStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, emptyState);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelay = useRef<number>(1000);
+  const listenersRef = useRef<Set<FrameListener>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +258,13 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
         try {
           const frame = JSON.parse(ev.data) as UiFrame;
           dispatch({ kind: "frame", frame });
+          for (const fn of listenersRef.current) {
+            try {
+              fn(frame);
+            } catch (err) {
+              console.warn("ws frame listener threw", err);
+            }
+          }
         } catch (e) {
           console.warn("bad ws payload", e);
         }
@@ -266,9 +288,23 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const listenersApi = useMemo(
+    () => ({
+      add: (fn: FrameListener) => {
+        listenersRef.current.add(fn);
+        return () => {
+          listenersRef.current.delete(fn);
+        };
+      },
+    }),
+    []
+  );
+
   return (
     <UIStateContext.Provider value={{ state, dispatch }}>
-      {children}
+      <WsListenersContext.Provider value={listenersApi}>
+        {children}
+      </WsListenersContext.Provider>
     </UIStateContext.Provider>
   );
 }
@@ -294,4 +330,23 @@ export function usePendingSwitches(): Set<string> {
       "usePendingSwitches must be used inside UIStateProvider"
     );
   return ctx.state.pendingSwitches;
+}
+
+/**
+ * Subscribe to every incoming WS frame. The listener is registered once per
+ * mount and unsubscribed on cleanup. Safe to call from any descendant of
+ * `UIStateProvider`. Unlike `useUIState`, this does NOT cause the caller to
+ * re-render when state changes — it's a pure side-channel.
+ */
+export function useWsFrames(listener: FrameListener): void {
+  const ctx = useContext(WsListenersContext);
+  if (!ctx)
+    throw new Error("useWsFrames must be used inside UIStateProvider");
+  const ref = useRef(listener);
+  useEffect(() => {
+    ref.current = listener;
+  }, [listener]);
+  useEffect(() => {
+    return ctx.add((frame) => ref.current(frame));
+  }, [ctx]);
 }
