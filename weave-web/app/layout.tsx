@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { UIStateProvider } from "@/lib/ws";
+import { RecentEventsProvider } from "@/lib/recent-events";
 import { AppShell } from "@/components/AppShell";
 
 const geistSans = Geist({
@@ -33,8 +34,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <UIStateProvider>
-          <AppShell>{children}</AppShell>
-          {drawer}
+          <RecentEventsProvider>
+            <AppShell>{children}</AppShell>
+            {drawer}
+          </RecentEventsProvider>
         </UIStateProvider>
       </body>
     </html>
