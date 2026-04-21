@@ -222,13 +222,20 @@ function CandidateRow({
           )}
         </div>
       </div>
-      <div className="min-w-32">
-        <Input
-          value={candidate.label}
-          onChange={(e) => onLabelChange(e.target.value)}
-          placeholder="label"
-        />
-      </div>
+      {/* When the target is picked from the known-targets list the Select's
+          option text already shows the live display name (which is what
+          `c.label` is auto-populated with). Rendering a second Label input
+          would just restate that name. The Label input only appears in raw
+          mode, where the user has to supply a name themselves. */}
+      {useRaw && (
+        <div className="min-w-32">
+          <Input
+            value={candidate.label}
+            onChange={(e) => onLabelChange(e.target.value)}
+            placeholder="label"
+          />
+        </div>
+      )}
       <GlyphPicker
         value={candidate.glyph}
         onChange={onGlyphChange}
