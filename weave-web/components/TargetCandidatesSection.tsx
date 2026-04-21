@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useUIState } from "@/lib/ws";
-import { useKnownTargets } from "@/hooks/useKnownTargets";
+import { useKnownTargets, type KnownTarget } from "@/hooks/useKnownTargets";
 import { GlyphPicker } from "./GlyphPicker";
-import type { TargetCandidate } from "@/lib/api";
+import type { Glyph, TargetCandidate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -124,78 +125,148 @@ export function TargetCandidatesSection({
           rotate to browse, press to confirm.
         </Text>
       )}
-      {candidates.map((c, i) => {
-        return (
-          <div
-            key={i}
-            className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10"
+      {candidates.map((c, i) => (
+        <CandidateRow
+          key={i}
+          index={i}
+          candidate={c}
+          total={candidates.length}
+          knownTargets={knownTargets}
+          glyphs={state.glyphs}
+          onTargetChange={(target) => setTarget(i, target)}
+          onLabelChange={(label) => setField(i, "label", label)}
+          onGlyphChange={(glyph) => setField(i, "glyph", glyph)}
+          onMoveUp={() => move(i, -1)}
+          onMoveDown={() => move(i, 1)}
+          onRemove={() => remove(i)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CandidateRow({
+  index,
+  candidate,
+  total,
+  knownTargets,
+  glyphs,
+  onTargetChange,
+  onLabelChange,
+  onGlyphChange,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  index: number;
+  candidate: TargetCandidate;
+  total: number;
+  knownTargets: KnownTarget[];
+  glyphs: Glyph[];
+  onTargetChange: (target: string) => void;
+  onLabelChange: (label: string) => void;
+  onGlyphChange: (glyph: string) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
+}) {
+  // Match the Target section's UX: Select of known targets is the default,
+  // with an opt-in "use raw value" escape hatch. Preference is per-row so
+  // mixing pick-from-list and raw candidates within one mapping is fine.
+  const isKnown = knownTargets.some((t) => t.target === candidate.target);
+  const [userPrefersRaw, setUserPrefersRaw] = useState<boolean | null>(null);
+  const mustUseRaw =
+    knownTargets.length === 0 ||
+    (candidate.target !== "" && !isKnown);
+  const useRaw = userPrefersRaw ?? mustUseRaw;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10">
+      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+        #{index + 1}
+      </span>
+      <div className="min-w-40 flex-1">
+        {!useRaw && knownTargets.length > 0 ? (
+          <Select
+            value={candidate.target}
+            onChange={(e) => onTargetChange(e.target.value)}
           >
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              #{i + 1}
+            <option value="">— pick —</option>
+            {knownTargets.map((t) => (
+              <option key={t.target} value={t.target}>
+                {t.label}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <Input
+            value={candidate.target}
+            onChange={(e) => onTargetChange(e.target.value)}
+            placeholder="service_target"
+            className="font-mono"
+          />
+        )}
+        <div className="mt-1 text-xs">
+          {knownTargets.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setUserPrefersRaw(!useRaw)}
+              className="text-blue-600 hover:underline dark:text-blue-400"
+            >
+              {useRaw ? "← pick from list" : "use raw value"}
+            </button>
+          ) : (
+            <span className="text-zinc-500 dark:text-zinc-400">
+              No live targets — enter a raw value.
             </span>
-            <div className="min-w-40 flex-1">
-              <Input
-                value={c.target}
-                onChange={(e) => setTarget(i, e.target.value)}
-                list={
-                  knownTargets.length > 0
-                    ? `target-candidate-suggest-${i}`
-                    : undefined
-                }
-                placeholder="service_target"
-                className="font-mono"
-              />
-              {knownTargets.length > 0 && (
-                <datalist id={`target-candidate-suggest-${i}`}>
-                  {knownTargets.map((t) => (
-                    <option key={t.target} value={t.target}>
-                      {t.label}
-                    </option>
-                  ))}
-                </datalist>
-              )}
-            </div>
-            <div className="min-w-32">
-              <Input
-                value={c.label}
-                onChange={(e) => setField(i, "label", e.target.value)}
-                placeholder="label"
-              />
-            </div>
-            <GlyphPicker
-              value={c.glyph}
-              onChange={(v) => setField(i, "glyph", v)}
-              glyphs={state.glyphs}
-            />
-            <Button
-              type="button"
-              plain
-              onClick={() => move(i, -1)}
-              disabled={i === 0}
-              title="Move up"
-            >
-              ↑
-            </Button>
-            <Button
-              type="button"
-              plain
-              onClick={() => move(i, 1)}
-              disabled={i === candidates.length - 1}
-              title="Move down"
-            >
-              ↓
-            </Button>
-            <Button
-              type="button"
-              plain
-              onClick={() => remove(i)}
-              className="!text-red-600"
-            >
-              ✕
-            </Button>
-          </div>
-        );
-      })}
+          )}
+        </div>
+      </div>
+      {/* When the target is picked from the known-targets list the Select's
+          option text already shows the live display name (which is what
+          `c.label` is auto-populated with). Rendering a second Label input
+          would just restate that name. The Label input only appears in raw
+          mode, where the user has to supply a name themselves. */}
+      {useRaw && (
+        <div className="min-w-32">
+          <Input
+            value={candidate.label}
+            onChange={(e) => onLabelChange(e.target.value)}
+            placeholder="label"
+          />
+        </div>
+      )}
+      <GlyphPicker
+        value={candidate.glyph}
+        onChange={onGlyphChange}
+        glyphs={glyphs}
+      />
+      <Button
+        type="button"
+        plain
+        onClick={onMoveUp}
+        disabled={index === 0}
+        title="Move up"
+      >
+        ↑
+      </Button>
+      <Button
+        type="button"
+        plain
+        onClick={onMoveDown}
+        disabled={index === total - 1}
+        title="Move down"
+      >
+        ↓
+      </Button>
+      <Button
+        type="button"
+        plain
+        onClick={onRemove}
+        className="!text-red-600"
+      >
+        ✕
+      </Button>
     </div>
   );
 }

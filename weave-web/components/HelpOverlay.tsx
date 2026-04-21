@@ -26,6 +26,7 @@ export function HelpOverlay() {
           <Section heading="Actions">
             <Row keys={["Enter"]} label="Default action on selected row" />
             <Row keys={["e"]} label="Edit selected row's mapping" />
+            <Row keys={["s"]} label="Switch target for selected row" />
             <Row keys={["n"]} label="New mapping" />
             <Row keys={["?"]} label="Toggle this help" />
           </Section>

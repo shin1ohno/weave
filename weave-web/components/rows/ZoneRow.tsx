@@ -52,11 +52,6 @@ export function ZoneRow({ target, states, controllers }: Props) {
   // Deep-link edit goes to the first active controller if any.
   const primary = controllers.find((m) => m.active) ?? controllers[0];
 
-  const { isSelected } = useRowSelectionRegistration({
-    id: `zone:roon:${target}`,
-    primaryMappingId: primary?.mapping_id,
-  });
-
   // Precompute whether the primary controller has anywhere to switch to —
   // either author-defined target_candidates or at least one other known
   // zone in the live service_states. Hook must be called unconditionally.
@@ -67,6 +62,12 @@ export function ZoneRow({ target, states, controllers }: Props) {
       knownTargets.length > 1 ||
       (knownTargets.length === 1 &&
         knownTargets[0].target !== primary.service_target));
+
+  const { isSelected } = useRowSelectionRegistration({
+    id: `zone:roon:${target}`,
+    primaryMappingId: primary?.mapping_id,
+    switchMappingId: canSwitch ? primary?.mapping_id : undefined,
+  });
 
   return (
     <div

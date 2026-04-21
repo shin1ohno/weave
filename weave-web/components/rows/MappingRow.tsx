@@ -1,10 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { deleteMapping, type Mapping } from "@/lib/api";
 import { useUIDispatch } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
@@ -15,19 +23,26 @@ interface Props {
 
 export function MappingRow({ mapping, targetLabel }: Props) {
   const dispatch = useUIDispatch();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { isSelected } = useRowSelectionRegistration({
     id: `mapping:${mapping.mapping_id}`,
     primaryMappingId: mapping.mapping_id,
   });
 
-  const handleDelete = async () => {
-    if (!confirm("Delete this mapping?")) return;
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
     dispatch({ kind: "local_delete_mapping", id: mapping.mapping_id });
     try {
       await deleteMapping(mapping.mapping_id);
+      setDeleteOpen(false);
     } catch (e) {
-      alert(`Delete failed: ${(e as Error).message}`);
+      setDeleteError((e as Error).message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -63,7 +78,14 @@ export function MappingRow({ mapping, targetLabel }: Props) {
           >
             edit
           </Link>
-          <Button plain onClick={handleDelete} className="!text-red-600 !px-0">
+          <Button
+            plain
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteOpen(true);
+            }}
+            className="!text-red-600 !px-0"
+          >
             delete
           </Button>
         </div>
@@ -74,6 +96,39 @@ export function MappingRow({ mapping, targetLabel }: Props) {
           {routesSummary}
         </div>
       )}
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => (deleting ? null : setDeleteOpen(false))}
+        size="sm"
+      >
+        <DialogTitle>Delete this mapping?</DialogTitle>
+        <DialogDescription>
+          {mapping.device_type}/{shorten(mapping.device_id)} →{" "}
+          {mapping.service_type}/
+          {targetLabel || shorten(mapping.service_target)} will be removed.
+          This cannot be undone.
+        </DialogDescription>
+        {deleteError && (
+          <DialogBody>
+            <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+              {deleteError}
+            </div>
+          </DialogBody>
+        )}
+        <DialogActions>
+          <Button
+            plain
+            onClick={() => setDeleteOpen(false)}
+            disabled={deleting}
+          >
+            Cancel
+          </Button>
+          <Button color="red" onClick={confirmDelete} disabled={deleting}>
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

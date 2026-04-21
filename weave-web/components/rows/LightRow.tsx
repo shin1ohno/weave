@@ -28,11 +28,6 @@ export function LightRow({ target, entry, controllers }: Props) {
 
   const primary = controllers.find((m) => m.active) ?? controllers[0];
 
-  const { isSelected } = useRowSelectionRegistration({
-    id: `light:hue:${target}`,
-    primaryMappingId: primary?.mapping_id,
-  });
-
   const knownTargets = useKnownTargets(primary?.service_type ?? "");
   const canSwitch =
     !!primary &&
@@ -40,6 +35,12 @@ export function LightRow({ target, entry, controllers }: Props) {
       knownTargets.length > 1 ||
       (knownTargets.length === 1 &&
         knownTargets[0].target !== primary.service_target));
+
+  const { isSelected } = useRowSelectionRegistration({
+    id: `light:hue:${target}`,
+    primaryMappingId: primary?.mapping_id,
+    switchMappingId: canSwitch ? primary?.mapping_id : undefined,
+  });
 
   return (
     <div
