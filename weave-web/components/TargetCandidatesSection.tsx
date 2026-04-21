@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
 import { useUIState } from "@/lib/ws";
+import { useKnownTargets } from "@/hooks/useKnownTargets";
 import { GlyphPicker } from "./GlyphPicker";
 import type { TargetCandidate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -44,32 +44,9 @@ export function TargetCandidatesSection({
   serviceTarget,
 }: Props) {
   const state = useUIState();
-
-  // Reuse the same "known targets" heuristic as the mapping form header —
-  // filter live service_states by the mapping's service_type + the target-
-  // identity property (zone / light / ...).
-  const knownTargets = useMemo(() => {
-    const metaProperty =
-      serviceType === "hue"
-        ? "light"
-        : serviceType === "roon"
-          ? "zone"
-          : null;
-    if (!metaProperty) return [];
-    const seen = new Set<string>();
-    const out: { target: string; label: string }[] = [];
-    for (const s of state.serviceStates) {
-      if (s.service_type !== serviceType) continue;
-      if (s.property !== metaProperty) continue;
-      if (seen.has(s.target)) continue;
-      seen.add(s.target);
-      const label =
-        (s.value as { display_name?: string } | undefined)?.display_name ??
-        s.target;
-      out.push({ target: s.target, label });
-    }
-    return out;
-  }, [state.serviceStates, serviceType]);
+  // Shared "known targets" heuristic (see useKnownTargets) — same shape the
+  // inline SwitchTargetPopover consumes.
+  const knownTargets = useKnownTargets(serviceType);
 
   const labelFor = (target: string) =>
     knownTargets.find((t) => t.target === target)?.label ?? "";

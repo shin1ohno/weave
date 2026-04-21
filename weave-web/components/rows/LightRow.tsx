@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
+import { useKnownTargets } from "@/hooks/useKnownTargets";
 
 interface Props {
   target: string;
@@ -22,6 +26,14 @@ export function LightRow({ target, entry, controllers }: Props) {
     typeof value?.brightness === "number" ? value.brightness : null;
 
   const primary = controllers.find((m) => m.active) ?? controllers[0];
+
+  const knownTargets = useKnownTargets(primary?.service_type ?? "");
+  const canSwitch =
+    !!primary &&
+    ((primary.target_candidates?.length ?? 0) > 0 ||
+      knownTargets.length > 1 ||
+      (knownTargets.length === 1 &&
+        knownTargets[0].target !== primary.service_target));
 
   return (
     <div className="rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
@@ -46,6 +58,7 @@ export function LightRow({ target, entry, controllers }: Props) {
               </div>
             </div>
           )}
+          {primary && canSwitch && <SwitchTargetPopover mapping={primary} />}
           {primary && (
             <Link
               href={`/mappings/${primary.mapping_id}/edit`}
