@@ -60,11 +60,27 @@ export function GlyphPicker({
   const selectHasValue = value === "" || filtered.some((g) => g.name === value);
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <div className="w-28 shrink-0">
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      <label className="text-xs text-zinc-500 dark:text-zinc-400">
+        glyph
+      </label>
+      <div className="w-32 shrink-0">
         <Select
           value={category}
-          onChange={(e) => setCategory(e.target.value as Category)}
+          onChange={(e) => {
+            const next = e.target.value as Category;
+            setCategory(next);
+            // If the current value falls outside the new category, clear
+            // it so the user can pick freely from the narrowed list
+            // instead of seeing a stale "(out of category)" carry-over.
+            if (
+              next !== "all" &&
+              value !== "" &&
+              categorize(value) !== next
+            ) {
+              onChange("");
+            }
+          }}
           aria-label="Glyph category"
         >
           <option value="all">All</option>
