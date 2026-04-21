@@ -19,10 +19,3 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
 
-# TEMPORARY: pull EdgeToServer::SwitchTarget from the sibling edge-agent
-# checkout during local development of the target-selection runtime.
-# Remove this patch and bump the crates.io dep once the extended
-# weave-contracts (expected 0.3.0) is published.
-[patch.crates-io]
-weave-contracts = { path = "../edge-agent/crates/weave-contracts" }
-
