@@ -1,5 +1,8 @@
+"use client";
+
 import { EdgeInfo } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
   edge: EdgeInfo;
@@ -18,8 +21,20 @@ function relativeTime(iso: string): string {
 }
 
 export function EdgeRow({ edge, deviceCount }: Props) {
+  // Edges have no primary mapping — Enter does nothing for them (by design).
+  const { isSelected } = useRowSelectionRegistration({
+    id: `edge:${edge.edge_id}`,
+  });
+
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
+    <div
+      data-selected={isSelected ? "true" : undefined}
+      className={`flex flex-wrap items-center gap-3 rounded-md border bg-white px-4 py-2 text-sm shadow-sm dark:bg-zinc-900 ${
+        isSelected
+          ? "border-blue-500 ring-2 ring-blue-500"
+          : "border-zinc-950/5 dark:border-white/10"
+      }`}
+    >
       <span
         className={`h-2 w-2 shrink-0 rounded-full ${
           edge.online ? "bg-green-500" : "bg-zinc-400"

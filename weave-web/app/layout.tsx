@@ -4,6 +4,11 @@ import "./globals.css";
 import { UIStateProvider } from "@/lib/ws";
 import { RecentEventsProvider } from "@/lib/recent-events";
 import { AppShell } from "@/components/AppShell";
+import { CommandPalette } from "@/components/CommandPalette";
+import { HelpOverlay } from "@/components/HelpOverlay";
+import { KeyboardBindings } from "@/components/KeyboardBindings";
+import { CommandUIProvider } from "@/hooks/useCommandUI";
+import { RowSelectionProvider } from "@/hooks/useRowSelection";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,8 +40,15 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
         <UIStateProvider>
           <RecentEventsProvider>
-            <AppShell>{children}</AppShell>
-            {drawer}
+            <CommandUIProvider>
+              <RowSelectionProvider>
+                <AppShell>{children}</AppShell>
+                {drawer}
+                <KeyboardBindings />
+                <CommandPalette />
+                <HelpOverlay />
+              </RowSelectionProvider>
+            </CommandUIProvider>
           </RecentEventsProvider>
         </UIStateProvider>
       </body>

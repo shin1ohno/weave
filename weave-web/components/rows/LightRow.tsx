@@ -5,6 +5,7 @@ import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
 import { useKnownTargets } from "@/hooks/useKnownTargets";
+import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
   target: string;
@@ -27,6 +28,11 @@ export function LightRow({ target, entry, controllers }: Props) {
 
   const primary = controllers.find((m) => m.active) ?? controllers[0];
 
+  const { isSelected } = useRowSelectionRegistration({
+    id: `light:hue:${target}`,
+    primaryMappingId: primary?.mapping_id,
+  });
+
   const knownTargets = useKnownTargets(primary?.service_type ?? "");
   const canSwitch =
     !!primary &&
@@ -36,7 +42,14 @@ export function LightRow({ target, entry, controllers }: Props) {
         knownTargets[0].target !== primary.service_target));
 
   return (
-    <div className="rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
+    <div
+      data-selected={isSelected ? "true" : undefined}
+      className={`rounded-md border bg-white px-4 py-2 text-sm shadow-sm dark:bg-zinc-900 ${
+        isSelected
+          ? "border-blue-500 ring-2 ring-blue-500"
+          : "border-zinc-950/5 dark:border-white/10"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <Badge color={on ? "amber" : "zinc"}>{on ? "on" : "off"}</Badge>
         <span className="min-w-0 truncate font-medium text-zinc-950 dark:text-white">
