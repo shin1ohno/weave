@@ -12,6 +12,7 @@ export default function NewMappingDrawer() {
         mode={{ kind: "new" }}
         onSaved={() => router.back()}
         onCancel={() => router.back()}
+        variant="drawer"
       />
     </Drawer>
   );

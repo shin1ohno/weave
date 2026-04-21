@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Headless from "@headlessui/react";
 import type { Mapping, TargetCandidate } from "@/lib/api";
 import { switchTarget } from "@/lib/api";
 import { useUIState, useUIDispatch } from "@/lib/ws";
 import { useKnownTargets } from "@/hooks/useKnownTargets";
+import { useRowSelection } from "@/hooks/useRowSelection";
 import { GlyphPreview } from "./GlyphPreview";
 
 interface Props {
@@ -42,6 +43,29 @@ export function SwitchTargetPopover({ mapping }: Props) {
   const knownTargets = useKnownTargets(mapping.service_type);
   const abortRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const announceRef = useRef<HTMLSpanElement | null>(null);
+
+  // Observe the RowSelection `requestedAction` channel for a matching
+  // open request (fired by `s` keybind or command palette's "Switch target"
+  // entry). When the ids align we imperatively click the PopoverButton —
+  // there is no declarative `open` prop on Headless `Popover`, so the click
+  // is the one supported path to programmatic open. The announce text is
+  // written to the DOM directly (external-system update) to stay out of
+  // React state and keep the effect free of `setState`-in-effect violations.
+  const { requestedAction, consumeAction } = useRowSelection();
+  useEffect(() => {
+    if (!requestedAction) return;
+    if (requestedAction.kind !== "switch") return;
+    if (requestedAction.mappingId !== mapping.mapping_id) return;
+    buttonRef.current?.click();
+    if (announceRef.current) {
+      // Clear then set — assistive tech announces only on text change.
+      announceRef.current.textContent = "";
+      announceRef.current.textContent = "Switch target opened";
+    }
+    consumeAction();
+  }, [requestedAction, mapping.mapping_id, consumeAction]);
 
   const choices: Choice[] = useMemo(() => {
     const explicit: TargetCandidate[] = mapping.target_candidates ?? [];
@@ -114,11 +138,18 @@ export function SwitchTargetPopover({ mapping }: Props) {
   return (
     <Headless.Popover className="relative">
       <Headless.PopoverButton
+        ref={buttonRef}
         className="rounded border border-zinc-200 px-2 py-0.5 text-xs text-zinc-700 hover:bg-zinc-50 focus:outline-none data-focus:ring-2 data-focus:ring-blue-500 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         aria-label="Switch target"
       >
         switch
       </Headless.PopoverButton>
+      <span
+        ref={announceRef}
+        role="status"
+        aria-live="polite"
+        className="sr-only"
+      />
       <Headless.PopoverPanel
         anchor="bottom end"
         transition

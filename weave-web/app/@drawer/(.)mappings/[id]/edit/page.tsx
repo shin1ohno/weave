@@ -14,6 +14,7 @@ export default function EditMappingDrawer() {
       <MappingEditForm
         mode={{ kind: "edit", mappingId: id }}
         onSaved={() => router.back()}
+        variant="drawer"
       />
     </Drawer>
   );

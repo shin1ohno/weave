@@ -21,7 +21,7 @@ export function CommandPalette() {
   const { paletteOpen, closePalette } = useCommandUI();
   const { mappings, glyphs, edges, serviceStates } = useUIState();
   const router = useRouter();
-  const { setSelectedId } = useRowSelection();
+  const { setSelectedId, requestAction } = useRowSelection();
 
   // Map service_type:target → display_name for nicer mapping labels.
   const targetLabels = useMemo(() => {
@@ -34,6 +34,47 @@ export function CommandPalette() {
     }
     return m;
   }, [serviceStates]);
+
+  // Per-service-type live target list. Shares the shape used by
+  // `useKnownTargets` / `TargetCandidatesSection`: meta-property is `light`
+  // for `hue`, `zone` for `roon`. Used to decide which mappings get a
+  // "Switch target" palette action.
+  const knownTargetsByService = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const s of serviceStates) {
+      const metaProperty =
+        s.service_type === "hue"
+          ? "light"
+          : s.service_type === "roon"
+            ? "zone"
+            : null;
+      if (metaProperty === null) continue;
+      if (s.property !== metaProperty) continue;
+      if (!map.has(s.service_type)) map.set(s.service_type, new Set());
+      map.get(s.service_type)!.add(s.target);
+    }
+    return map;
+  }, [serviceStates]);
+
+  const switchableMappings = useMemo(() => {
+    return mappings.filter((m) => {
+      if ((m.target_candidates?.length ?? 0) > 0) return true;
+      const live = knownTargetsByService.get(m.service_type);
+      if (!live) return false;
+      if (live.size > 1) return true;
+      return live.size === 1 && !live.has(m.service_target);
+    });
+  }, [mappings, knownTargetsByService]);
+
+  function rowIdForMapping(m: Mapping): string | null {
+    // Only zone/light rows render a SwitchTargetPopover, so the palette
+    // action can only open the popover for those targets. For non-live
+    // mappings we fall through and only dispatch requestAction; the popover
+    // will pick it up once the row exists.
+    if (m.service_type === "roon") return `zone:roon:${m.service_target}`;
+    if (m.service_type === "hue") return `light:hue:${m.service_target}`;
+    return null;
+  }
 
   function run(action: () => void) {
     closePalette();
@@ -89,6 +130,32 @@ export function CommandPalette() {
               Open glyph gallery
             </PaletteItem>
           </Command.Group>
+
+          {switchableMappings.length > 0 && (
+            <Command.Group
+              heading="Switch target"
+              className="mb-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 dark:[&_[cmdk-group-heading]]:text-zinc-400"
+            >
+              {switchableMappings.map((m) => (
+                <PaletteItem
+                  key={`switch:${m.mapping_id}`}
+                  value={`switch target ${mappingLabel(m)} ${m.mapping_id}`}
+                  onSelect={() =>
+                    run(() => {
+                      const rowId = rowIdForMapping(m);
+                      if (rowId) setSelectedId(rowId);
+                      requestAction({
+                        mappingId: m.mapping_id,
+                        kind: "switch",
+                      });
+                    })
+                  }
+                >
+                  Switch target: {mappingLabel(m)}
+                </PaletteItem>
+              ))}
+            </Command.Group>
+          )}
 
           {mappings.length > 0 && (
             <Command.Group

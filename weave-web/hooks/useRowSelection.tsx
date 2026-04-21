@@ -25,6 +25,11 @@ import {
 export interface RowMeta {
   /** Optional default mapping id for Enter / `e` actions. */
   primaryMappingId?: string;
+  /** Optional mapping id the row's SwitchTargetPopover is attached to.
+   *  Only set when the row currently has somewhere to switch to — i.e. the
+   *  row renders a SwitchTargetPopover. Consumed by the `s` keybind and the
+   *  command palette's "Switch target" action. */
+  switchMappingId?: string;
   /** Optional navigation hint for Enter when no mapping is primary. */
   defaultHref?: string;
 }
@@ -33,6 +38,19 @@ interface RegisteredRow extends RowMeta {
   id: string;
   /** Monotonic tick captured on registration to preserve insertion order. */
   order: number;
+}
+
+/**
+ * A one-shot cross-component action request. The requester (KeyboardBindings,
+ * CommandPalette) sets this via `requestAction`; the owning component
+ * (SwitchTargetPopover) observes the matching id + kind in an effect,
+ * performs the action (opening its popover), and calls `consumeAction` to
+ * clear the slot. This replaces an earlier CustomEvent draft with an
+ * idiomatic React channel that cooperates with render scheduling and tests.
+ */
+export interface RequestedAction {
+  mappingId: string;
+  kind: "switch";
 }
 
 interface RowSelectionContextValue {
@@ -44,6 +62,9 @@ interface RowSelectionContextValue {
   movePrev: () => void;
   /** Look up the registered meta for the selected row. */
   getSelectedMeta: () => RegisteredRow | null;
+  requestedAction: RequestedAction | null;
+  requestAction: (action: RequestedAction) => void;
+  consumeAction: () => void;
 }
 
 const RowSelectionContext = createContext<RowSelectionContextValue | null>(
@@ -52,6 +73,8 @@ const RowSelectionContext = createContext<RowSelectionContextValue | null>(
 
 export function RowSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedId, setSelectedIdState] = useState<string | null>(null);
+  const [requestedAction, setRequestedAction] =
+    useState<RequestedAction | null>(null);
 
   // Refs so registration does not cause re-renders. The ordered list is
   // rebuilt whenever rows mount/unmount; state downstream is minimal
@@ -115,6 +138,13 @@ export function RowSelectionProvider({ children }: { children: ReactNode }) {
     return rowsRef.current.get(id) ?? null;
   }, []);
 
+  const requestAction = useCallback((action: RequestedAction) => {
+    setRequestedAction(action);
+  }, []);
+  const consumeAction = useCallback(() => {
+    setRequestedAction(null);
+  }, []);
+
   const value = useMemo<RowSelectionContextValue>(
     () => ({
       selectedId,
@@ -124,6 +154,9 @@ export function RowSelectionProvider({ children }: { children: ReactNode }) {
       moveNext,
       movePrev,
       getSelectedMeta,
+      requestedAction,
+      requestAction,
+      consumeAction,
     }),
     [
       selectedId,
@@ -133,6 +166,9 @@ export function RowSelectionProvider({ children }: { children: ReactNode }) {
       moveNext,
       movePrev,
       getSelectedMeta,
+      requestedAction,
+      requestAction,
+      consumeAction,
     ]
   );
 
@@ -162,15 +198,23 @@ export function useRowSelection(): RowSelectionContextValue {
 export function useRowSelectionRegistration(params: {
   id: string;
   primaryMappingId?: string;
+  switchMappingId?: string;
   defaultHref?: string;
 }): { isSelected: boolean } {
-  const { id, primaryMappingId, defaultHref } = params;
+  const { id, primaryMappingId, switchMappingId, defaultHref } = params;
   const { selectedId, registerRow, unregisterRow } = useRowSelection();
 
   useEffect(() => {
-    registerRow(id, { primaryMappingId, defaultHref });
+    registerRow(id, { primaryMappingId, switchMappingId, defaultHref });
     return () => unregisterRow(id);
-  }, [id, primaryMappingId, defaultHref, registerRow, unregisterRow]);
+  }, [
+    id,
+    primaryMappingId,
+    switchMappingId,
+    defaultHref,
+    registerRow,
+    unregisterRow,
+  ]);
 
   return { isSelected: selectedId === id };
 }

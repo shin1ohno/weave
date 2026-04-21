@@ -27,7 +27,8 @@ import { useRowSelection } from "@/hooks/useRowSelection";
  *   Enter         — default action for selected row (edit mapping if any)
  *   e             — open edit drawer for selected row's primary mapping
  *   n             — new mapping
- *   s             — reserved for Phase 3 SwitchTargetPopover (TODO)
+ *   s             — open SwitchTargetPopover for the selected row, when the
+ *                   row has a switch-capable primary mapping
  */
 export function KeyboardBindings() {
   const router = useRouter();
@@ -40,7 +41,8 @@ export function KeyboardBindings() {
     closeHelp,
     toggleHelp,
   } = useCommandUI();
-  const { moveNext, movePrev, getSelectedMeta } = useRowSelection();
+  const { moveNext, movePrev, getSelectedMeta, requestAction } =
+    useRowSelection();
 
   useEffect(() => {
     function isTypingTarget(target: EventTarget | null): boolean {
@@ -137,9 +139,14 @@ export function KeyboardBindings() {
           return;
         }
         case "s": {
-          // TODO(phase-3): wire to SwitchTargetPopover once the popover
-          // component lands. Held back intentionally so the keybind and
-          // popover ship together.
+          const meta = getSelectedMeta();
+          if (meta?.switchMappingId) {
+            e.preventDefault();
+            requestAction({
+              mappingId: meta.switchMappingId,
+              kind: "switch",
+            });
+          }
           return;
         }
         default:
@@ -160,6 +167,7 @@ export function KeyboardBindings() {
     moveNext,
     movePrev,
     getSelectedMeta,
+    requestAction,
     router,
   ]);
 
