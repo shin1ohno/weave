@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
   target: string;
@@ -47,8 +50,20 @@ export function ZoneRow({ target, states, controllers }: Props) {
   // Deep-link edit goes to the first active controller if any.
   const primary = controllers.find((m) => m.active) ?? controllers[0];
 
+  const { isSelected } = useRowSelectionRegistration({
+    id: `zone:roon:${target}`,
+    primaryMappingId: primary?.mapping_id,
+  });
+
   return (
-    <div className="rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
+    <div
+      data-selected={isSelected ? "true" : undefined}
+      className={`rounded-md border bg-white px-4 py-2 text-sm shadow-sm dark:bg-zinc-900 ${
+        isSelected
+          ? "border-blue-500 ring-2 ring-blue-500"
+          : "border-zinc-950/5 dark:border-white/10"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-3">
         <Badge color={pbColor}>{pbValue}</Badge>
         <span className="min-w-0 truncate font-medium text-zinc-950 dark:text-white">

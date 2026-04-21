@@ -5,6 +5,7 @@ import { deleteMapping, type Mapping } from "@/lib/api";
 import { useUIDispatch } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
   mapping: Mapping;
@@ -14,6 +15,11 @@ interface Props {
 
 export function MappingRow({ mapping, targetLabel }: Props) {
   const dispatch = useUIDispatch();
+
+  const { isSelected } = useRowSelectionRegistration({
+    id: `mapping:${mapping.mapping_id}`,
+    primaryMappingId: mapping.mapping_id,
+  });
 
   const handleDelete = async () => {
     if (!confirm("Delete this mapping?")) return;
@@ -30,7 +36,14 @@ export function MappingRow({ mapping, targetLabel }: Props) {
     .join(", ");
 
   return (
-    <div className="rounded-md border border-zinc-950/5 bg-white px-4 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-zinc-900">
+    <div
+      data-selected={isSelected ? "true" : undefined}
+      className={`rounded-md border bg-white px-4 py-2 text-sm shadow-sm dark:bg-zinc-900 ${
+        isSelected
+          ? "border-blue-500 ring-2 ring-blue-500"
+          : "border-zinc-950/5 dark:border-white/10"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Badge color={mapping.active ? "green" : "zinc"}>
           {mapping.active ? "active" : "inactive"}

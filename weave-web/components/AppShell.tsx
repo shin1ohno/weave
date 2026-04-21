@@ -1,11 +1,31 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { useUIState } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
+import { useCommandUI } from "@/hooks/useCommandUI";
+
+// Render the platform-appropriate modifier glyph only on the client to avoid
+// SSR / hydration mismatches (navigator is unavailable on the server). Using
+// useSyncExternalStore lets us keep the server snapshot stable (Ctrl) while
+// swapping to the client-detected value on hydration without a state-in-effect.
+const subscribePlatform = () => () => {};
+const getPlatformClient = () =>
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl";
+const getPlatformServer = () => "Ctrl";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { connected } = useUIState();
+  const { openPalette } = useCommandUI();
+  const modKey = useSyncExternalStore(
+    subscribePlatform,
+    getPlatformClient,
+    getPlatformServer
+  );
 
   return (
     <>
@@ -17,7 +37,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             weave
           </Link>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={openPalette}
+              aria-label="Open command palette"
+              title="Open command palette"
+              className="flex items-center gap-1.5 rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <kbd className="font-mono text-[11px]">{modKey}K</kbd>
+            </button>
             <Badge color={connected ? "green" : "zinc"}>
               <span
                 className={`h-2 w-2 rounded-full ${
