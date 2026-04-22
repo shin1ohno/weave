@@ -64,8 +64,7 @@ async fn list_presets() -> Json<Vec<Preset>> {
         Preset {
             id: "discovery",
             label: "Discovery",
-            description:
-                "Rotate → brightness, press → toggle power, swipes → explicit on/off.",
+            description: "Rotate → brightness, press → toggle power, swipes → explicit on/off.",
             routes: vec![
                 route(InputType::Rotate, IntentType::BrightnessChange, 80.0),
                 route(InputType::Press, IntentType::PowerToggle, 1.0),
