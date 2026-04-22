@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.3...weave-server-v0.1.4) - 2026-04-22
+
+### Other
+
+- cross-service target candidates (server + engine + web UI) ([#25](https://github.com/shin1ohno/weave/pull/25))
+
 ## [0.1.3](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.2...weave-server-v0.1.3) - 2026-04-21
 
 ### Added
