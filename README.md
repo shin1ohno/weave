@@ -120,6 +120,8 @@ Then:
 - Web UI: <http://localhost:3100>
 - REST / WS: `http://localhost:3101/api/mappings`, `ws://localhost:3101/ws/edge`, `ws://localhost:3101/ws/ui`
 
+> **Trusted LAN only.** This exposes REST, WebSocket, and MQTT without authentication. See [Operational Assumptions](#operational-assumptions) before opening any of these ports beyond a household network.
+
 ### Standalone `weave-server`
 
 ```
@@ -151,6 +153,46 @@ Everything mutable lives in the SQLite store behind the REST API. A `Mapping` re
 Glyphs are JSON rows with a 9×9 ASCII pattern (`*` = on, anything else = off).
 
 See [`SPEC.md`](./SPEC.md) for the full data model, API surface, and design rationale.
+
+## Operational Assumptions
+
+This system bakes in the following assumptions. If any of them don't hold in your deployment, treat it as a redesign signal, not a config change.
+
+### Trust boundary
+
+- Trusted LAN only. No authentication on `/ws/edge`, `/ws/ui`, `/api/*`, or the MQTT broker.
+- Anyone on the same network segment can impersonate an edge, edit mappings, and control the bound Roon / Hue endpoints.
+- Not designed for: multi-tenant, internet-exposed, guest-Wi-Fi bridged, or IoT-VLAN-crossing deployments.
+- To go wider: front `weave-server` with a reverse proxy that terminates mTLS or an auth layer, and lock down the mosquitto broker with ACLs before touching network topology.
+
+### Target deployment scale
+
+- Primary: one household, ≤ 5 devices, 1–2 edges.
+- Secondary (tested, works): small office, ≤ 10 edges, single `weave-server`.
+- Out of scope today: N > 10 edges, multi-site, geographic distribution, HA `weave-server` (SQLite single instance, no replication).
+- Config push has no canary. A typo in the UI reaches every edge bound to that mapping in one WebSocket round-trip.
+
+### Latency boundary (what `<10 ms` means)
+
+- Measured from: BLE GATT notification received on the edge host.
+- Measured to: Roon MOO `change_volume` RPC buffered to socket (adapter-side send).
+- **Not** measured: physical rotation → audible volume change. The full chain adds Roon Core scheduling + DAC latency and is outside weave's control.
+- Median on LAN with Linux BlueZ + local Roon Core. p99 can exceed 50 ms on BLE reconnect or Roon extension re-handshake.
+- Hard floor: BLE connection interval (7.5–30 ms on typical peripherals) bounds how often rotate ticks can physically arrive.
+- MQTT path adds one broker hop: roughly +10–50 ms on a local mosquitto, more on remote brokers.
+
+### Compatibility policy
+
+- `weave-contracts` is the wire contract between `weave-server` and `edge-agent`. Treat it as a published API.
+- Today's semver rules:
+  - **MINOR** — struct field addition (all structs tolerate unknown/missing fields via `#[serde(default)]`).
+  - **MAJOR** — enum variant addition on `ServerToEdge` / `EdgeToServer` / `UiFrame` / `PatchOp`. These are `#[serde(tag = "type")]` with no `#[serde(other)]` fallback, so unknown variants are hard errors on old peers.
+  - **MAJOR** — field rename or removal.
+- Rolling-upgrade order:
+  - New `EdgeToServer` variant (edge → server): deploy `edge-agent` first.
+  - New `ServerToEdge` variant (server → edge): deploy `weave-server` first.
+  - Struct field additions: order doesn't matter.
+- Installs from crates.io can mix versions. `cargo install weave-server` + an independently built `edge-agent` is **not** a supported combination unless their `weave-contracts` minor versions match.
 
 ## Related reading
 
