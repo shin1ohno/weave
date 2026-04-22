@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useUIState } from "@/lib/ws";
-import { useKnownTargets, type KnownTarget } from "@/hooks/useKnownTargets";
+import { useKnownTargets } from "@/hooks/useKnownTargets";
 import { GlyphPicker } from "./GlyphPicker";
-import type { Glyph, TargetCandidate } from "@/lib/api";
+import type { Glyph, Route, TargetCandidate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Subheading } from "@/components/ui/heading";
 import { Text, Code } from "@/components/ui/text";
+import { INPUT_TYPES, INTENT_TYPES } from "./MappingEditForm";
 
 // Inputs allowed as the selection-mode trigger. These are the snake-case
 // serialized names of the Rust `InputType` enum (weave-engine primitives).
@@ -27,11 +28,19 @@ const SWITCH_INPUTS = [
   "long_touch_right",
 ];
 
+// Same canonical list as MappingEditForm's SERVICE_TYPES. Duplicated
+// intentionally to avoid pulling non-Type imports across the component
+// boundary; update both when adding a service.
+const SERVICE_TYPES = ["roon", "hue"];
+
 interface Props {
   candidates: TargetCandidate[];
   switchOn: string | null;
   onCandidatesChange: (next: TargetCandidate[]) => void;
   onSwitchOnChange: (next: string | null) => void;
+  /** The parent mapping's service_type. Candidates without an override
+   *  inherit this; candidates with an override can target a different
+   *  service entirely (cross-service switching). */
   serviceType: string;
   serviceTarget: string;
 }
@@ -45,42 +54,23 @@ export function TargetCandidatesSection({
   serviceTarget,
 }: Props) {
   const state = useUIState();
-  // Shared "known targets" heuristic (see useKnownTargets) — same shape the
-  // inline SwitchTargetPopover consumes.
-  const knownTargets = useKnownTargets(serviceType);
-
-  const labelFor = (target: string) =>
-    knownTargets.find((t) => t.target === target)?.label ?? "";
 
   const setField = (
     i: number,
     field: keyof TargetCandidate,
-    value: string
+    value: TargetCandidate[keyof TargetCandidate]
   ) => {
     const next = [...candidates];
     next[i] = { ...next[i], [field]: value };
     onCandidatesChange(next);
   };
-  const setTarget = (i: number, target: string) => {
-    const next = [...candidates];
-    // Auto-populate label from live state when target changes, unless the
-    // user has already customized the label.
-    const inferred = labelFor(target);
-    const label =
-      next[i].label && next[i].label !== labelFor(next[i].target)
-        ? next[i].label
-        : inferred;
-    next[i] = { ...next[i], target, label };
-    onCandidatesChange(next);
-  };
   const remove = (i: number) =>
     onCandidatesChange(candidates.filter((_, idx) => idx !== i));
   const add = () => {
-    // Default to the current service_target as the first pick so the user
-    // can quickly add the already-active target to the rotation.
+    // Default the first candidate to the current service_target so the
+    // user can quickly include the already-active target in the rotation.
     const target = candidates.length === 0 ? serviceTarget : "";
-    const label = target ? labelFor(target) : "";
-    onCandidatesChange([...candidates, { target, label, glyph: "" }]);
+    onCandidatesChange([...candidates, { target, label: "", glyph: "" }]);
   };
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -122,7 +112,9 @@ export function TargetCandidatesSection({
         <Text>
           No candidates. Add 2+ entries and set <Code>switch on</Code> to let
           the device cycle between targets — e.g. long-press to enter mode,
-          rotate to browse, press to confirm.
+          rotate to browse, press to confirm. Candidates can point to a
+          different service than the mapping default (Roon zone ↔ Hue light)
+          by picking a Service Type override.
         </Text>
       )}
       {candidates.map((c, i) => (
@@ -131,9 +123,13 @@ export function TargetCandidatesSection({
           index={i}
           candidate={c}
           total={candidates.length}
-          knownTargets={knownTargets}
+          mappingServiceType={serviceType}
           glyphs={state.glyphs}
-          onTargetChange={(target) => setTarget(i, target)}
+          onCandidateChange={(next) => {
+            const all = [...candidates];
+            all[i] = next;
+            onCandidatesChange(all);
+          }}
           onLabelChange={(label) => setField(i, "label", label)}
           onGlyphChange={(glyph) => setField(i, "glyph", glyph)}
           onMoveUp={() => move(i, -1)}
@@ -149,9 +145,9 @@ function CandidateRow({
   index,
   candidate,
   total,
-  knownTargets,
+  mappingServiceType,
   glyphs,
-  onTargetChange,
+  onCandidateChange,
   onLabelChange,
   onGlyphChange,
   onMoveUp,
@@ -161,112 +157,284 @@ function CandidateRow({
   index: number;
   candidate: TargetCandidate;
   total: number;
-  knownTargets: KnownTarget[];
+  mappingServiceType: string;
   glyphs: Glyph[];
-  onTargetChange: (target: string) => void;
+  onCandidateChange: (next: TargetCandidate) => void;
   onLabelChange: (label: string) => void;
   onGlyphChange: (glyph: string) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onRemove: () => void;
 }) {
+  // Effective service for this candidate — override wins, else inherit
+  // from the mapping.
+  const effectiveServiceType = candidate.service_type ?? mappingServiceType;
+  const isOverridden = candidate.service_type !== undefined;
+  const knownTargets = useKnownTargets(effectiveServiceType);
+
   // Match the Target section's UX: Select of known targets is the default,
   // with an opt-in "use raw value" escape hatch. Preference is per-row so
   // mixing pick-from-list and raw candidates within one mapping is fine.
   const isKnown = knownTargets.some((t) => t.target === candidate.target);
   const [userPrefersRaw, setUserPrefersRaw] = useState<boolean | null>(null);
   const mustUseRaw =
-    knownTargets.length === 0 ||
-    (candidate.target !== "" && !isKnown);
+    knownTargets.length === 0 || (candidate.target !== "" && !isKnown);
   const useRaw = userPrefersRaw ?? mustUseRaw;
 
+  const setTarget = (target: string) => {
+    const inferred =
+      knownTargets.find((t) => t.target === target)?.label ?? "";
+    const oldInferred =
+      knownTargets.find((t) => t.target === candidate.target)?.label ?? "";
+    const label =
+      candidate.label && candidate.label !== oldInferred
+        ? candidate.label
+        : inferred;
+    onCandidateChange({ ...candidate, target, label });
+  };
+
+  const setServiceTypeOverride = (value: string) => {
+    // "inherit" means drop the override; changing the service resets the
+    // target (a Roon zone id is never a Hue light id). Routes are also
+    // cleared so the user picks a fresh set — the former routes are
+    // meaningless against a different service.
+    if (value === "") {
+      onCandidateChange({
+        ...candidate,
+        service_type: undefined,
+        target: "",
+        label: "",
+        routes: undefined,
+      });
+    } else {
+      onCandidateChange({
+        ...candidate,
+        service_type: value,
+        target: "",
+        label: "",
+        // Seed with empty list so the routes editor appears immediately.
+        routes: candidate.routes ?? [],
+      });
+    }
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10">
-      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-        #{index + 1}
-      </span>
-      <div className="min-w-40 flex-1">
-        {!useRaw && knownTargets.length > 0 ? (
+    <div className="space-y-2 rounded-lg border border-zinc-950/5 p-3 dark:border-white/10">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          #{index + 1}
+        </span>
+        <div className="min-w-32">
           <Select
-            value={candidate.target}
-            onChange={(e) => onTargetChange(e.target.value)}
+            value={candidate.service_type ?? ""}
+            onChange={(e) => setServiceTypeOverride(e.target.value)}
+            aria-label="Service type override"
           >
-            <option value="">— pick —</option>
-            {knownTargets.map((t) => (
-              <option key={t.target} value={t.target}>
-                {t.label}
+            <option value="">inherit ({mappingServiceType})</option>
+            {SERVICE_TYPES.filter((s) => s !== mappingServiceType).map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
+            {/* Allow setting the override to the same value as the mapping's
+                default for explicit intent — not common, but harmless. */}
+            <option value={mappingServiceType}>{mappingServiceType}</option>
           </Select>
-        ) : (
-          <Input
-            value={candidate.target}
-            onChange={(e) => onTargetChange(e.target.value)}
-            placeholder="service_target"
-            className="font-mono"
-          />
-        )}
-        <div className="mt-1 text-xs">
-          {knownTargets.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setUserPrefersRaw(!useRaw)}
-              className="text-blue-600 hover:underline dark:text-blue-400"
+        </div>
+        <div className="min-w-40 flex-1">
+          {!useRaw && knownTargets.length > 0 ? (
+            <Select
+              value={candidate.target}
+              onChange={(e) => setTarget(e.target.value)}
             >
-              {useRaw ? "← pick from list" : "use raw value"}
-            </button>
+              <option value="">— pick —</option>
+              {knownTargets.map((t) => (
+                <option key={t.target} value={t.target}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
           ) : (
-            <span className="text-zinc-500 dark:text-zinc-400">
-              No live targets — enter a raw value.
-            </span>
+            <Input
+              value={candidate.target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="service_target"
+              className="font-mono"
+            />
           )}
+          <div className="mt-1 text-xs">
+            {knownTargets.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setUserPrefersRaw(!useRaw)}
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {useRaw ? "← pick from list" : "use raw value"}
+              </button>
+            ) : (
+              <span className="text-zinc-500 dark:text-zinc-400">
+                No live targets for <Code>{effectiveServiceType}</Code> — enter a raw value.
+              </span>
+            )}
+          </div>
         </div>
+        {/* Label input only shows in raw mode — otherwise the Select's
+            option text already shows the live display name. */}
+        {useRaw && (
+          <div className="min-w-32">
+            <Input
+              value={candidate.label}
+              onChange={(e) => onLabelChange(e.target.value)}
+              placeholder="label"
+            />
+          </div>
+        )}
+        <GlyphPicker
+          value={candidate.glyph}
+          onChange={onGlyphChange}
+          glyphs={glyphs}
+        />
+        <Button
+          type="button"
+          plain
+          onClick={onMoveUp}
+          disabled={index === 0}
+          title="Move up"
+        >
+          ↑
+        </Button>
+        <Button
+          type="button"
+          plain
+          onClick={onMoveDown}
+          disabled={index === total - 1}
+          title="Move down"
+        >
+          ↓
+        </Button>
+        <Button
+          type="button"
+          plain
+          onClick={onRemove}
+          className="!text-red-600"
+        >
+          ✕
+        </Button>
       </div>
-      {/* When the target is picked from the known-targets list the Select's
-          option text already shows the live display name (which is what
-          `c.label` is auto-populated with). Rendering a second Label input
-          would just restate that name. The Label input only appears in raw
-          mode, where the user has to supply a name themselves. */}
-      {useRaw && (
-        <div className="min-w-32">
-          <Input
-            value={candidate.label}
-            onChange={(e) => onLabelChange(e.target.value)}
-            placeholder="label"
-          />
-        </div>
+      {isOverridden && (
+        <CandidateRoutesEditor
+          routes={candidate.routes ?? []}
+          onChange={(routes) => onCandidateChange({ ...candidate, routes })}
+          serviceTypeLabel={effectiveServiceType}
+        />
       )}
-      <GlyphPicker
-        value={candidate.glyph}
-        onChange={onGlyphChange}
-        glyphs={glyphs}
-      />
-      <Button
-        type="button"
-        plain
-        onClick={onMoveUp}
-        disabled={index === 0}
-        title="Move up"
-      >
-        ↑
-      </Button>
-      <Button
-        type="button"
-        plain
-        onClick={onMoveDown}
-        disabled={index === total - 1}
-        title="Move down"
-      >
-        ↓
-      </Button>
-      <Button
-        type="button"
-        plain
-        onClick={onRemove}
-        className="!text-red-600"
-      >
-        ✕
-      </Button>
+    </div>
+  );
+}
+
+/** Routes editor scoped to a single candidate. Reuses the Input / Intent /
+ *  damping triplet from MappingEditForm's RouteRow but inlined — keeping
+ *  this file independent of internal MappingEditForm helpers. */
+function CandidateRoutesEditor({
+  routes,
+  onChange,
+  serviceTypeLabel,
+}: {
+  routes: Route[];
+  onChange: (next: Route[]) => void;
+  serviceTypeLabel: string;
+}) {
+  const update = (i: number, next: Route) => {
+    const out = [...routes];
+    out[i] = next;
+    onChange(out);
+  };
+  const add = () =>
+    onChange([...routes, { input: "press", intent: "power_toggle" }]);
+  const remove = (i: number) => onChange(routes.filter((_, k) => k !== i));
+
+  return (
+    <div className="ml-6 space-y-2 border-l-2 border-zinc-200 pl-3 dark:border-zinc-700">
+      <div className="flex items-center justify-between gap-2">
+        <Text className="text-xs">
+          Routes for <Code>{serviceTypeLabel}</Code> — replaces the mapping&apos;s
+          default routes while this candidate is active.
+        </Text>
+        <Button type="button" plain onClick={add} className="text-xs">
+          + Add route
+        </Button>
+      </div>
+      {routes.length === 0 && (
+        <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+          No routes yet — add at least one so the device has something to do
+          when this candidate is selected.
+        </Text>
+      )}
+      {routes.map((r, i) => {
+        const isRotate = r.input === "rotate";
+        const damping =
+          typeof r.params?.damping === "number" ? r.params.damping : 1;
+        return (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <div className="min-w-36">
+              <Select
+                value={r.input}
+                onChange={(e) => update(i, { ...r, input: e.target.value })}
+                aria-label="Input"
+              >
+                {INPUT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <span className="text-zinc-400">→</span>
+            <div className="min-w-40">
+              <Select
+                value={r.intent}
+                onChange={(e) => update(i, { ...r, intent: e.target.value })}
+                aria-label="Intent"
+              >
+                {INTENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+                {!INTENT_TYPES.includes(r.intent) && (
+                  <option value={r.intent}>{r.intent}</option>
+                )}
+              </Select>
+            </div>
+            <div className="w-20">
+              <Input
+                type="number"
+                value={damping}
+                disabled={!isRotate}
+                onChange={(e) =>
+                  update(i, {
+                    ...r,
+                    params: { damping: Number(e.target.value) },
+                  })
+                }
+                title={
+                  isRotate ? "Damping factor" : "Damping applies only to `rotate`"
+                }
+                aria-label="Damping"
+                className={!isRotate ? "opacity-60" : undefined}
+              />
+            </div>
+            <Button
+              type="button"
+              plain
+              onClick={() => remove(i)}
+              className="!text-red-600"
+            >
+              ✕
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }
