@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from "@/components/icon";
 import { RoutesEditor } from "@/components/RoutesEditor";
+import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
 import { NuimoViz } from "./NuimoViz";
 import { RoutePill } from "./RoutePill";
 
@@ -156,6 +157,7 @@ export function ConnectionCard({
 
         <div className="ml-auto flex items-center gap-2">
           <StatusChip target={target} />
+          <SwitchTargetPopover mapping={mapping} />
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
