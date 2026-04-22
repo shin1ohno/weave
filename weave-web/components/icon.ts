@@ -30,6 +30,10 @@ import {
   Pencil,
   Check,
   WifiOff,
+  Radio,
+  Cpu,
+  Send,
+  AlertCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -89,6 +93,10 @@ export {
   Target,
   RotateCw,
   Lightbulb,
+  Radio,
+  Cpu,
+  Send,
+  AlertCircle,
 };
 
 export type { LucideIcon };

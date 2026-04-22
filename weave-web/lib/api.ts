@@ -92,6 +92,14 @@ export interface UiSnapshot {
   glyphs: Glyph[];
 }
 
+/** Per-command outcome carried by `UiFrame::Command`. `kind` matches the
+ * Rust-side `CommandResult` tag. */
+export type CommandResult =
+  | { kind: "ok" }
+  | { kind: "err"; message: string };
+
+export type ErrorSeverity = "warn" | "error" | "fatal";
+
 export type UiFrame =
   | { type: "snapshot"; snapshot: UiSnapshot }
   | { type: "edge_online"; edge: EdgeInfo }
@@ -121,7 +129,28 @@ export type UiFrame =
       op: "upsert" | "delete";
       mapping: Mapping | null;
     }
-  | { type: "glyphs_changed"; glyphs: Glyph[] };
+  | { type: "glyphs_changed"; glyphs: Glyph[] }
+  | {
+      type: "command";
+      edge_id: string;
+      service_type: string;
+      target: string;
+      intent: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params: any;
+      result: CommandResult;
+      latency_ms?: number;
+      output_id?: string;
+      at: string;
+    }
+  | {
+      type: "error";
+      edge_id: string;
+      context: string;
+      message: string;
+      severity: ErrorSeverity;
+      at: string;
+    };
 
 /** Compute absolute WebSocket URL. Called lazily from client code so that
  * `window.location.origin` is available when API_BASE is empty (proxied

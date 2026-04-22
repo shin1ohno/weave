@@ -6,7 +6,7 @@ import { InputStreamPanel } from "@/components/TryItPanel/InputStreamPanel";
 export default function StreamPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-lg border border-zinc-950/5 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900">
-      <InputStreamPanel variant="drawer" title="Live input stream" />
+      <InputStreamPanel variant="drawer" title="Live stream" />
     </div>
   );
 }
