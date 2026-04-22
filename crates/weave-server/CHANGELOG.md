@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.4...weave-server-v0.1.5) - 2026-04-22
+
+### Other
+
+- cargo fmt api.rs preset description
+- Routes editor rebuild + preset API + inline expand
+
 ## [0.1.4](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.3...weave-server-v0.1.4) - 2026-04-22
 
 ### Other
