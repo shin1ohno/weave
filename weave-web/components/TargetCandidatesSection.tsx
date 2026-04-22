@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Subheading } from "@/components/ui/heading";
 import { Text, Code } from "@/components/ui/text";
-import { INPUT_TYPES, INTENT_TYPES } from "./MappingEditForm";
+import { INPUT_TYPES, INTENT_TYPES } from "./RoutesEditor/vocab";
 
 // Inputs allowed as the selection-mode trigger. These are the snake-case
 // serialized names of the Rust `InputType` enum (weave-engine primitives).

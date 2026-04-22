@@ -20,6 +20,16 @@ import {
   wsUrl,
 } from "./api";
 
+export type ConnectionsFilter = "all" | "active" | "firing";
+
+export interface LastInput {
+  input: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  value?: any;
+  /** Epoch ms after which the DeviceTile should stop rendering the input. */
+  expiresAt: number;
+}
+
 interface UIState {
   connected: boolean;
   edges: EdgeInfo[];
@@ -35,6 +45,19 @@ interface UIState {
    * because no ACK will arrive.
    */
   pendingSwitches: Set<string>;
+  /** Currently selected device in the 3-pane Connections view. Null means
+   * "no device selected" → the center pane shows every connection. */
+  selectedDeviceId: string | null;
+  /** Center-pane filter chip. `all` shows everything, `active` hides
+   * soft-disabled mappings, `firing` shows only the connections that are
+   * firing right now. AND-combined with `selectedDeviceId`. */
+  connectionsFilter: ConnectionsFilter;
+  /** Mapping IDs currently firing. Populated by `fire_mapping` and cleared
+   * by `unfire_mapping` (driven by a 2s timer in ConnectionsView effect). */
+  firingMappingIds: Set<string>;
+  /** Last observed input per device (by `device_id`). Used for the
+   * DeviceTile "last input" line and the ConnectionCard footer. */
+  lastInputByDevice: Record<string, LastInput>;
 }
 
 const emptyState: UIState = {
@@ -45,6 +68,10 @@ const emptyState: UIState = {
   mappings: [],
   glyphs: [],
   pendingSwitches: new Set<string>(),
+  selectedDeviceId: null,
+  connectionsFilter: "all",
+  firingMappingIds: new Set<string>(),
+  lastInputByDevice: {},
 };
 
 type Action =
@@ -56,9 +83,26 @@ type Action =
   | { kind: "local_upsert_glyph"; glyph: Glyph }
   | { kind: "local_set_mapping_target"; id: string; service_target: string }
   | { kind: "switch_pending_start"; id: string }
-  | { kind: "switch_pending_end"; id: string };
+  | { kind: "switch_pending_end"; id: string }
+  | { kind: "set_selected_device"; deviceId: string | null }
+  | { kind: "set_connections_filter"; filter: ConnectionsFilter }
+  | {
+      kind: "fire_mapping";
+      mapping_ids: string[];
+      device_id: string;
+      input: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      value?: any;
+      /** 2s firing window by default — caller may pass a shorter value. */
+      ttlMs?: number;
+    }
+  | { kind: "unfire_mapping"; mapping_id: string };
 
-function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
+function applySnapshot(
+  prev: UIState,
+  snapshot: UiSnapshot,
+  connected: boolean
+): UIState {
   return {
     connected,
     edges: snapshot.edges,
@@ -67,6 +111,14 @@ function applySnapshot(snapshot: UiSnapshot, connected: boolean): UIState {
     mappings: snapshot.mappings,
     glyphs: snapshot.glyphs,
     pendingSwitches: new Set<string>(),
+    // Preserve user UI selection across reconnects — the snapshot represents
+    // server truth, not user intent.
+    selectedDeviceId: prev.selectedDeviceId,
+    connectionsFilter: prev.connectionsFilter,
+    // Firing / last-input are derived from live events; a fresh snapshot is
+    // a clean slate for them.
+    firingMappingIds: new Set<string>(),
+    lastInputByDevice: {},
   };
 }
 
@@ -120,11 +172,41 @@ function reducer(state: UIState, action: Action): UIState {
       next.delete(action.id);
       return { ...state, pendingSwitches: next };
     }
+    case "set_selected_device":
+      if (state.selectedDeviceId === action.deviceId) return state;
+      return { ...state, selectedDeviceId: action.deviceId };
+    case "set_connections_filter":
+      if (state.connectionsFilter === action.filter) return state;
+      return { ...state, connectionsFilter: action.filter };
+    case "fire_mapping": {
+      const ttl = action.ttlMs ?? 2000;
+      const expiresAt = Date.now() + ttl;
+      const nextFiring = new Set(state.firingMappingIds);
+      for (const id of action.mapping_ids) nextFiring.add(id);
+      return {
+        ...state,
+        firingMappingIds: nextFiring,
+        lastInputByDevice: {
+          ...state.lastInputByDevice,
+          [action.device_id]: {
+            input: action.input,
+            value: action.value,
+            expiresAt,
+          },
+        },
+      };
+    }
+    case "unfire_mapping": {
+      if (!state.firingMappingIds.has(action.mapping_id)) return state;
+      const next = new Set(state.firingMappingIds);
+      next.delete(action.mapping_id);
+      return { ...state, firingMappingIds: next };
+    }
     case "frame": {
       const frame = action.frame;
       switch (frame.type) {
         case "snapshot":
-          return applySnapshot(frame.snapshot, state.connected);
+          return applySnapshot(state, frame.snapshot, state.connected);
         case "edge_online": {
           const others = state.edges.filter(
             (e) => e.edge_id !== frame.edge.edge_id
@@ -330,6 +412,58 @@ export function usePendingSwitches(): Set<string> {
       "usePendingSwitches must be used inside UIStateProvider"
     );
   return ctx.state.pendingSwitches;
+}
+
+/** Currently selected device for the Connections pane filter, plus setter.
+ * Returns `null` when nothing is selected (center pane unfiltered). */
+export function useSelectedDevice(): [
+  string | null,
+  (deviceId: string | null) => void,
+] {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error("useSelectedDevice must be used inside UIStateProvider");
+  return [
+    ctx.state.selectedDeviceId,
+    (deviceId) => ctx.dispatch({ kind: "set_selected_device", deviceId }),
+  ];
+}
+
+/** Center-pane filter chip (`all` / `active` / `firing`) with setter. */
+export function useConnectionsFilter(): [
+  ConnectionsFilter,
+  (filter: ConnectionsFilter) => void,
+] {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error(
+      "useConnectionsFilter must be used inside UIStateProvider"
+    );
+  return [
+    ctx.state.connectionsFilter,
+    (filter) => ctx.dispatch({ kind: "set_connections_filter", filter }),
+  ];
+}
+
+/** Set of currently firing mapping IDs. Re-rendered whenever a new
+ * `fire_mapping` / `unfire_mapping` is dispatched. */
+export function useFiringMappingIds(): Set<string> {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error(
+      "useFiringMappingIds must be used inside UIStateProvider"
+    );
+  return ctx.state.firingMappingIds;
+}
+
+/** Last observed input per device. Indexed by `device_id`. */
+export function useLastInputByDevice(): Record<string, LastInput> {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error(
+      "useLastInputByDevice must be used inside UIStateProvider"
+    );
+  return ctx.state.lastInputByDevice;
 }
 
 /**

@@ -1,5 +1,5 @@
-import { LiveConsole } from "@/components/LiveConsole";
+import { ConnectionsView } from "@/components/ConnectionsView";
 
 export default function Home() {
-  return <LiveConsole />;
+  return <ConnectionsView />;
 }

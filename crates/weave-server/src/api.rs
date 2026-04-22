@@ -19,6 +19,72 @@ pub fn router() -> Router<AppCtx> {
         .route("/api/mappings/:id", put(update_mapping))
         .route("/api/mappings/:id", delete(delete_mapping))
         .route("/api/mappings/{id}/target", post(switch_target))
+        .route("/api/presets", get(list_presets))
+}
+
+// ---------- Presets -------------------------------------------------------
+// Read-only starter templates for the Routes editor. Stays server-side so
+// multiple clients see the same list, and so future tweaks ship without
+// requiring a web-UI redeploy. Kept static for now — user-editable presets
+// would need schema + CRUD and are explicitly out of scope.
+
+#[derive(serde::Serialize)]
+struct Preset {
+    id: &'static str,
+    label: &'static str,
+    description: &'static str,
+    routes: Vec<weave_engine::Route>,
+}
+
+async fn list_presets() -> Json<Vec<Preset>> {
+    use weave_engine::intents::IntentType;
+    use weave_engine::primitives::InputType;
+    use weave_engine::route::{Route, RouteParams};
+
+    fn route(input: InputType, intent: IntentType, damping: f64) -> Route {
+        Route {
+            input,
+            intent,
+            params: RouteParams { damping },
+        }
+    }
+
+    Json(vec![
+        Preset {
+            id: "music_default",
+            label: "Music default",
+            description: "Rotate → volume, press → play/pause, swipe → next/prev.",
+            routes: vec![
+                route(InputType::Rotate, IntentType::VolumeChange, 80.0),
+                route(InputType::Press, IntentType::PlayPause, 1.0),
+                route(InputType::SwipeRight, IntentType::Next, 1.0),
+                route(InputType::SwipeLeft, IntentType::Previous, 1.0),
+            ],
+        },
+        Preset {
+            id: "discovery",
+            label: "Discovery",
+            description: "Rotate → brightness, press → toggle power, swipes → explicit on/off.",
+            routes: vec![
+                route(InputType::Rotate, IntentType::BrightnessChange, 80.0),
+                route(InputType::Press, IntentType::PowerToggle, 1.0),
+                route(InputType::SwipeUp, IntentType::PowerOn, 1.0),
+                route(InputType::SwipeDown, IntentType::PowerOff, 1.0),
+            ],
+        },
+        Preset {
+            id: "single_button",
+            label: "Single button",
+            description: "Just one gesture: press → play/pause. Good for locked targets.",
+            routes: vec![route(InputType::Press, IntentType::PlayPause, 1.0)],
+        },
+        Preset {
+            id: "custom",
+            label: "Custom",
+            description: "Start from scratch — no routes assigned.",
+            routes: vec![],
+        },
+    ])
 }
 
 fn to_contract(m: &Mapping) -> Option<ContractMapping> {
