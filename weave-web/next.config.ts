@@ -23,7 +23,11 @@ const nextConfig: NextConfig = {
       { source: "/edges", destination: "/", permanent: true },
       { source: "/mappings", destination: "/", permanent: true },
       {
-        source: "/mappings/:id",
+        // Match UUID-shaped mapping ids only — not `new` (which is the
+        // "create new mapping" page at `app/mappings/new/page.tsx`) and
+        // not multi-segment paths like `<id>/edit` (which would otherwise
+        // cause an infinite redirect loop with the catch-all regex).
+        source: "/mappings/:id([0-9a-f-]+)",
         destination: "/mappings/:id/edit",
         permanent: true,
       },
