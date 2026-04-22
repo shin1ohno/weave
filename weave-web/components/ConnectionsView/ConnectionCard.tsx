@@ -1,14 +1,21 @@
 "use client";
 
 import clsx from "clsx";
-import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Mapping } from "@/lib/api";
 import type { DeviceSummary } from "@/lib/devices";
 import type { ServiceTarget } from "@/lib/services";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Pencil, Play, Lightbulb, Volume2 } from "@/components/icon";
+import { Separator } from "@/components/ui/separator";
+import {
+  Pencil,
+  Play,
+  Lightbulb,
+  Volume2,
+  ChevronDown,
+} from "@/components/icon";
+import { RoutesEditor } from "@/components/RoutesEditor";
 import { NuimoViz } from "./NuimoViz";
 import { RoutePill } from "./RoutePill";
 
@@ -55,6 +62,7 @@ export function ConnectionCard({
   firing,
   lastEvent,
 }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const variant = firing
     ? "firing"
     : mapping.active
@@ -148,24 +156,38 @@ export function ConnectionCard({
 
         <div className="ml-auto flex items-center gap-2">
           <StatusChip target={target} />
-          <Link
-            href={`/mappings/${mapping.mapping_id}/edit`}
-            aria-label="Edit connection"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 opacity-0 transition hover:bg-zinc-100 group-hover:opacity-100 dark:hover:bg-white/5"
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            aria-label={expanded ? "Collapse editor" : "Edit connection"}
+            aria-expanded={expanded}
+            className={clsx(
+              "flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 dark:hover:bg-white/5",
+              expanded ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
           >
-            <Pencil className="h-3.5 w-3.5" />
-          </Link>
+            {expanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" />
+            )}
+          </button>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="mt-3 flex w-full flex-wrap items-center gap-1.5 text-left"
+        aria-label={expanded ? "Collapse routes editor" : "Expand routes editor"}
+      >
         {mapping.routes.map((r, i) => (
           <RoutePill key={i} route={r} />
         ))}
         {mapping.routes.length === 0 && (
           <span className="text-xs italic text-zinc-400">no routes yet</span>
         )}
-      </div>
+      </button>
 
       {(feedbackStates || mapping.target_switch_on || !mapping.active || lastEvent) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-500 dark:border-white/5">
@@ -185,6 +207,20 @@ export function ConnectionCard({
           {lastEvent && (
             <span className="ml-auto font-mono text-[11px]">{lastEvent}</span>
           )}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="mt-4">
+          <Separator />
+          <div className="mt-4">
+            <RoutesEditor
+              mode={{ kind: "edit", mappingId: mapping.mapping_id }}
+              onSaved={() => setExpanded(false)}
+              onCancel={() => setExpanded(false)}
+              variant="inline"
+            />
+          </div>
         </div>
       )}
     </Card>
