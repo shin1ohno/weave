@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useMappingDraft, type DraftMode } from "@/hooks/useMappingDraft";
+import { useTryIt } from "@/hooks/useTryIt";
 import type { Mapping } from "@/lib/api";
 import { PresetChips } from "./PresetChips";
 import { RoutesList } from "./RoutesList";
@@ -74,6 +75,7 @@ export function RoutesEditor({
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const isEdit = mode.kind === "edit";
+  const tryIt = useTryIt();
 
   if (loadError && !mapping)
     return <Text className="text-red-600">{loadError}</Text>;
@@ -237,6 +239,16 @@ export function RoutesEditor({
           >
             {saving ? "Saving…" : isEdit ? "Save" : "Create connection"}
           </Button>
+          {isEdit && mapping && (
+            <Button
+              type="button"
+              color="orange"
+              onClick={() => tryIt.openFor(mapping)}
+              aria-label="Open Try it panel"
+            >
+              Try it now
+            </Button>
+          )}
           {onCancel && (
             <Button type="button" outline onClick={onCancel}>
               Cancel

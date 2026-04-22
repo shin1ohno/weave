@@ -10,6 +10,7 @@ import { KeyboardBindings } from "@/components/KeyboardBindings";
 import { CommandUIProvider } from "@/hooks/useCommandUI";
 import { RowSelectionProvider } from "@/hooks/useRowSelection";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { TryItProvider } from "@/hooks/useTryIt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,11 +45,13 @@ export default function RootLayout({
             <RecentEventsProvider>
               <CommandUIProvider>
                 <RowSelectionProvider>
-                  <AppShell>{children}</AppShell>
-                  {drawer}
-                  <KeyboardBindings />
-                  <CommandPalette />
-                  <HelpOverlay />
+                  <TryItProvider>
+                    <AppShell>{children}</AppShell>
+                    {drawer}
+                    <KeyboardBindings />
+                    <CommandPalette />
+                    <HelpOverlay />
+                  </TryItProvider>
                 </RowSelectionProvider>
               </CommandUIProvider>
             </RecentEventsProvider>

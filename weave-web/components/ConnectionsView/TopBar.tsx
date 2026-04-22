@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,12 @@ export function TopBar() {
           />
           {connected ? "live" : "offline"}
         </Badge>
+        <Link
+          href="/stream"
+          className="rounded-lg border border-zinc-950/10 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:border-zinc-950/20 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10"
+        >
+          Stream
+        </Link>
         <Button plain onClick={toggle} aria-label="Toggle theme">
           {theme === "dark" ? (
             <Sun className="h-4 w-4" />
