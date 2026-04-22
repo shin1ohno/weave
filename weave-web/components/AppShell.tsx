@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { useUIState } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +22,19 @@ const getPlatformServer = () => "Ctrl";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { connected } = useUIState();
   const { openPalette } = useCommandUI();
+  const pathname = usePathname();
   const modKey = useSyncExternalStore(
     subscribePlatform,
     getPlatformClient,
     getPlatformServer
   );
+
+  // The root page renders its own full-bleed chrome (ConnectionsView TopBar).
+  // Suppress AppShell's header/main wrappers there so the 3-pane layout can
+  // claim the viewport.
+  if (pathname === "/") {
+    return <>{children}</>;
+  }
 
   return (
     <>

@@ -9,6 +9,7 @@ import { HelpOverlay } from "@/components/HelpOverlay";
 import { KeyboardBindings } from "@/components/KeyboardBindings";
 import { CommandUIProvider } from "@/hooks/useCommandUI";
 import { RowSelectionProvider } from "@/hooks/useRowSelection";
+import { ThemeProvider } from "@/hooks/useTheme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,19 +39,21 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 dark:bg-zinc-950">
-        <UIStateProvider>
-          <RecentEventsProvider>
-            <CommandUIProvider>
-              <RowSelectionProvider>
-                <AppShell>{children}</AppShell>
-                {drawer}
-                <KeyboardBindings />
-                <CommandPalette />
-                <HelpOverlay />
-              </RowSelectionProvider>
-            </CommandUIProvider>
-          </RecentEventsProvider>
-        </UIStateProvider>
+        <ThemeProvider>
+          <UIStateProvider>
+            <RecentEventsProvider>
+              <CommandUIProvider>
+                <RowSelectionProvider>
+                  <AppShell>{children}</AppShell>
+                  {drawer}
+                  <KeyboardBindings />
+                  <CommandPalette />
+                  <HelpOverlay />
+                </RowSelectionProvider>
+              </CommandUIProvider>
+            </RecentEventsProvider>
+          </UIStateProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
