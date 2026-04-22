@@ -19,6 +19,20 @@ export interface TargetCandidate {
   target: string;
   label: string;
   glyph: string;
+  /**
+   * Optional: override the parent mapping's `service_type` when this
+   * candidate is the active target. Lets one mapping cycle between, e.g.,
+   * a Roon zone and a Hue light. When undefined, inherits the mapping's
+   * service_type.
+   */
+  service_type?: string;
+  /**
+   * Optional: override the parent mapping's `routes` when this candidate
+   * is active. In practice mandatory when `service_type` differs because
+   * intents are service-specific (Roon `volume_change` vs Hue
+   * `brightness_change`). When undefined, inherits the mapping's routes.
+   */
+  routes?: Route[];
 }
 
 export interface Mapping {

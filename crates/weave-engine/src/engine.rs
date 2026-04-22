@@ -74,8 +74,12 @@ impl RoutingEngine {
                 continue;
             }
             if let Some(intent) = mapping.route(input) {
+                // Resolve the effective service_type via the currently
+                // active target so cross-service candidates land on the
+                // right adapter downstream.
+                let (service_type, _) = mapping.effective_for(&mapping.service_target);
                 results.push(RoutedIntent {
-                    service_type: mapping.service_type.clone(),
+                    service_type: service_type.to_string(),
                     service_target: mapping.service_target.clone(),
                     intent,
                     device_type: mapping.device_type.clone(),
