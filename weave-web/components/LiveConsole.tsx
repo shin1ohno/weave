@@ -3,6 +3,7 @@
 import { EdgesPanel } from "@/components/panels/EdgesPanel";
 import { ZonesPanel } from "@/components/panels/ZonesPanel";
 import { LightsPanel } from "@/components/panels/LightsPanel";
+import { MacPanel } from "@/components/panels/MacPanel";
 import { RecentEventsPanel } from "@/components/panels/RecentEventsPanel";
 import { MappingsPanel } from "@/components/panels/MappingsPanel";
 
@@ -21,6 +22,7 @@ export function LiveConsole() {
       <EdgesPanel />
       <ZonesPanel />
       <LightsPanel />
+      <MacPanel />
       <RecentEventsPanel />
       <MappingsPanel />
     </div>
