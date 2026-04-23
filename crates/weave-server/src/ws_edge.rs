@@ -13,7 +13,9 @@ use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 
-use weave_contracts::{EdgeConfig, EdgeToServer, Mapping as ContractMapping, ServerToEdge, UiFrame};
+use weave_contracts::{
+    EdgeConfig, EdgeToServer, Mapping as ContractMapping, ServerToEdge, UiFrame,
+};
 
 use crate::ctx::AppCtx;
 
