@@ -1,7 +1,7 @@
 [package]
 name = "weave-server"
 description = "HTTP/WebSocket/MQTT control plane for weave — persists mappings, pushes config to edge-agents, bridges MQTT devices to service adapters"
-version = "0.1.4"
+version = "0.1.5"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
