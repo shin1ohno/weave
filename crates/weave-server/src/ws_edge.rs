@@ -13,7 +13,7 @@ use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 
-use weave_contracts::{EdgeConfig, EdgeToServer, Mapping as ContractMapping, ServerToEdge};
+use weave_contracts::{EdgeConfig, EdgeToServer, Mapping as ContractMapping, ServerToEdge, UiFrame};
 
 use crate::ctx::AppCtx;
 
@@ -178,6 +178,44 @@ async fn handle_edge_text(
                 applied,
                 "edge-driven target switch"
             );
+        }
+        EdgeToServer::Command {
+            service_type,
+            target,
+            intent,
+            params,
+            result,
+            latency_ms,
+            output_id,
+        } => {
+            if let Some(eid) = edge_id.as_deref() {
+                ctx.hub.broadcast(UiFrame::Command {
+                    edge_id: eid.to_string(),
+                    service_type,
+                    target,
+                    intent,
+                    params,
+                    result,
+                    latency_ms,
+                    output_id,
+                    at: chrono::Utc::now().to_rfc3339(),
+                });
+            }
+        }
+        EdgeToServer::Error {
+            context,
+            message,
+            severity,
+        } => {
+            if let Some(eid) = edge_id.as_deref() {
+                ctx.hub.broadcast(UiFrame::Error {
+                    edge_id: eid.to_string(),
+                    context,
+                    message,
+                    severity,
+                    at: chrono::Utc::now().to_rfc3339(),
+                });
+            }
         }
     }
     Ok(())
