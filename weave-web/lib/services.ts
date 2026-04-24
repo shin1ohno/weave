@@ -1,10 +1,16 @@
 import type { Mapping, ServiceStateEntry } from "./api";
 
 /** The `meta` property on ServiceStateEntry that yields the
- * canonical "one row per target" view. Keyed by service_type. */
+ * canonical "one row per target" view. Keyed by service_type.
+ *
+ * macos uses `output_device` because every macos-hub publishes it on
+ * startup (retained), so a target row is created as soon as an
+ * adapter_macos connects. `volume` and `playback_active` are overlayed
+ * in the secondary pass. */
 const META_PROPERTY_BY_SERVICE: Record<string, string> = {
   roon: "zone",
   hue: "light",
+  macos: "output_device",
 };
 
 export interface ServiceTarget {
@@ -52,6 +58,14 @@ function extractStatus(
     if (v.on === false) return "off";
     return null;
   }
+  if (serviceType === "macos") {
+    // playback_active payload is `{"active": bool | null}`. In the MVP
+    // macos-hub always publishes null, so status typically stays null
+    // and only the volume level is surfaced.
+    if (v.active === true) return "playing";
+    if (v.active === false) return "idle";
+    return null;
+  }
   return null;
 }
 
@@ -75,6 +89,7 @@ function extractTrack(value: unknown): string | null {
 const DEFAULT_LABELS: Record<string, string> = {
   roon: "Roon",
   hue: "Hue",
+  macos: "macOS",
 };
 
 export function summarizeServices(
