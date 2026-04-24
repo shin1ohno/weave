@@ -23,9 +23,16 @@ function StatusChip({ target }: { target: ServiceTarget }) {
       <Badge color="green">
         <Play className="h-2.5 w-2.5" />
         playing
+        {target.level != null ? ` · ${Math.round(target.level)}%` : ""}
       </Badge>
     );
-  if (target.status === "idle") return <Badge color="zinc">idle</Badge>;
+  if (target.status === "idle")
+    return (
+      <Badge color="zinc">
+        idle
+        {target.level != null ? ` · ${Math.round(target.level)}%` : ""}
+      </Badge>
+    );
   if (target.status === "on")
     return (
       <Badge color="amber">
@@ -34,6 +41,10 @@ function StatusChip({ target }: { target: ServiceTarget }) {
       </Badge>
     );
   if (target.status === "off") return <Badge color="zinc">off</Badge>;
+  // status === null — still surface a level (e.g. macos volume when
+  // playback_active is unknown) so the user sees something.
+  if (target.level != null)
+    return <Badge color="emerald">{Math.round(target.level)}%</Badge>;
   return null;
 }
 
