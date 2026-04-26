@@ -7,7 +7,7 @@ import { Field, Label } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-const DEVICE_TYPES = ["nuimo"];
+const DEVICE_TYPES = ["nuimo", "hue_tap_dial"];
 
 interface Props {
   mapping: Mapping;

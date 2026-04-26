@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Lightbulb,
   Volume2,
+  Disc3,
   type LucideIcon,
 } from "@/components/icon";
 
@@ -223,6 +224,11 @@ function iconForEntry(e: StreamEntry): LucideIcon {
   if (e.kind === "service_state") {
     if (e.service_type === "hue") return Lightbulb;
     if (e.service_type === "roon") return Volume2;
+  }
+  // `dev` is `${device_type}/${id-suffix}` (see devLabel) — peel off the
+  // device_type to pick a controller-specific icon for input rows.
+  if (e.kind === "input" || e.kind === "device_state") {
+    if (e.dev.startsWith("hue_tap_dial/")) return Disc3;
   }
   return KIND_DESCRIPTORS[e.kind].icon;
 }

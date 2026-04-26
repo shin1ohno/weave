@@ -20,6 +20,12 @@ export const INPUT_TYPES = [
   "touch_left",
   "touch_right",
   "key_press",
+  // Numbered buttons (Hue Tap Dial: 1..=4). Other multi-button
+  // controllers can reuse the same vocabulary.
+  "button_1",
+  "button_2",
+  "button_3",
+  "button_4",
 ];
 
 export const INTENT_GROUPS: { label: string; items: string[] }[] = [
