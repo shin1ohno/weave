@@ -269,3 +269,53 @@ export async function deleteGlyph(name: string): Promise<void> {
   );
   if (!res.ok) throw new Error(`Failed to delete glyph: ${res.status}`);
 }
+
+// --- Device control ---
+//
+// Each helper POSTs an empty body to a path containing the device triple
+// `(edge_id, device_type, device_id)`. The server pushes a `ServerToEdge`
+// frame to the named edge and returns 202 Accepted; we don't wait for an
+// edge-side ack. 404 surfaces as a thrown Error — typically meaning the
+// edge isn't currently connected.
+
+async function postDeviceCommand(
+  action: "connect" | "disconnect" | "test-glyph",
+  edgeId: string,
+  deviceType: string,
+  deviceId: string
+): Promise<void> {
+  const url =
+    `${API_BASE}/api/devices/${encodeURIComponent(edgeId)}` +
+    `/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceId)}/${action}`;
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(`Edge ${edgeId} is not currently connected`);
+    }
+    throw new Error(`Failed to ${action} device: ${res.status}`);
+  }
+}
+
+export async function connectDevice(
+  edgeId: string,
+  deviceType: string,
+  deviceId: string
+): Promise<void> {
+  return postDeviceCommand("connect", edgeId, deviceType, deviceId);
+}
+
+export async function disconnectDevice(
+  edgeId: string,
+  deviceType: string,
+  deviceId: string
+): Promise<void> {
+  return postDeviceCommand("disconnect", edgeId, deviceType, deviceId);
+}
+
+export async function testGlyphADevice(
+  edgeId: string,
+  deviceType: string,
+  deviceId: string
+): Promise<void> {
+  return postDeviceCommand("test-glyph", edgeId, deviceType, deviceId);
+}

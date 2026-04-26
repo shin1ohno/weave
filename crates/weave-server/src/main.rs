@@ -1,5 +1,6 @@
 mod api;
 mod ctx;
+mod devices;
 mod glyphs;
 mod mqtt;
 mod push_broker;
@@ -96,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app: Router = Router::new()
         .merge(api::router())
+        .merge(devices::router())
         .merge(glyphs::router())
         .merge(templates::router())
         .route("/ws/edge", get(ws_edge::handler))
