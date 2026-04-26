@@ -1,9 +1,16 @@
 "use client";
 
 import clsx from "clsx";
+import { useCallback, useRef, useState } from "react";
 import { Battery, DEVICE_ICON, Link2, WifiOff } from "@/components/icon";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LiveDot } from "@/components/ui/live-dot";
+import {
+  connectDevice,
+  disconnectDevice,
+  testGlyphADevice,
+} from "@/lib/api";
 import type { DeviceSummary } from "@/lib/devices";
 import type { LastInput } from "@/lib/ws";
 import { NuimoViz } from "./NuimoViz";
@@ -68,13 +75,83 @@ export function DeviceTile({
   // orange ping above is what signals "right now" — the footer line is
   // the historical record.
   const showLastInput = lastInput != null;
+
+  // Device-control button row state. `pending` debounces double-clicks;
+  // `error` surfaces a transient failure message that auto-clears after
+  // five seconds so it never sticks around forever.
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashError = useCallback((message: string) => {
+    setError(message);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
+  }, []);
+
+  const runDeviceAction = useCallback(
+    async (
+      e: React.MouseEvent<HTMLElement>,
+      action: (
+        edgeId: string,
+        deviceType: string,
+        deviceId: string
+      ) => Promise<void>
+    ) => {
+      e.stopPropagation();
+      setPending(true);
+      setError(null);
+      try {
+        await action(device.edge_id, device.device_type, device.device_id);
+      } catch (err) {
+        flashError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setPending(false);
+      }
+    },
+    [device.edge_id, device.device_type, device.device_id, flashError]
+  );
+
+  const onConnect = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => runDeviceAction(e, connectDevice),
+    [runDeviceAction]
+  );
+  const onDisconnect = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => runDeviceAction(e, disconnectDevice),
+    [runDeviceAction]
+  );
+  const onTestGlyph = useCallback(
+    (e: React.MouseEvent<HTMLElement>) => runDeviceAction(e, testGlyphADevice),
+    [runDeviceAction]
+  );
+
+  // The tile itself acts as a button (selecting the device), but its
+  // body now contains real <button> children (Connect / Disconnect /
+  // Test LED). HTML forbids nested buttons, and React + browsers split
+  // their interpretation of click bubbling on nested actionable elements.
+  // Render the wrapper as `role="button"` on a <div> with explicit
+  // keyboard activation (Enter / Space) so semantics match a native
+  // toggle and child buttons stay valid.
+  const onWrapperKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+    },
+    [onClick]
+  );
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={onWrapperKeyDown}
       aria-pressed={selected}
       className={clsx(
-        "group relative w-full cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition dark:bg-zinc-900",
+        "group relative w-full cursor-pointer rounded-xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-zinc-900",
         selected
           ? "border-blue-500 ring-2 ring-blue-500/30"
           : "border-zinc-950/5 hover:border-zinc-950/10 dark:border-white/10 dark:hover:border-white/15",
@@ -110,6 +187,44 @@ export function DeviceTile({
               {device.connectionsCount}
             </Badge>
           </div>
+          {/* Device-control row. `stopPropagation` keeps clicks on
+           * these buttons from bubbling up to the wrapper (which would
+           * toggle device selection). The wrapper is now a div with
+           * `role="button"`, but click bubbling still reaches it. */}
+          <div
+            className="mt-2 flex flex-wrap items-center gap-1.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              plain
+              disabled={device.connected || pending}
+              onClick={onConnect}
+              className="!px-2 !py-0.5 !text-[11px]"
+            >
+              Connect
+            </Button>
+            <Button
+              plain
+              disabled={!device.connected || pending}
+              onClick={onDisconnect}
+              className="!px-2 !py-0.5 !text-[11px]"
+            >
+              Disconnect
+            </Button>
+            <Button
+              plain
+              disabled={!device.connected || pending}
+              onClick={onTestGlyph}
+              className="!px-2 !py-0.5 !text-[11px]"
+            >
+              Test LED · A
+            </Button>
+          </div>
+          {error && (
+            <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
+              {error}
+            </div>
+          )}
           {showLastInput && lastInput && (
             <div
               className={clsx(
@@ -129,6 +244,6 @@ export function DeviceTile({
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }

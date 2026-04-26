@@ -17,7 +17,7 @@ axum = { version = "0.7", features = ["ws"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 uuid = { workspace = true }
 weave-engine = { version = "0.1", path = "../weave-engine" }
-weave-contracts = "0.7"
+weave-contracts = "0.8"
 rumqttc = "0.24"
 serde = { workspace = true }
 serde_json = { workspace = true }
