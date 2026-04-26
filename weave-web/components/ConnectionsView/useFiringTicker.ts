@@ -34,7 +34,16 @@ export function useFiringTicker() {
     if (frame.property !== "input") return;
 
     const input = extractInputName(frame.value);
-    if (!input) return;
+    if (!input) {
+      // Surfaces malformed `input` payloads that slip past the property
+      // filter — useful when the edge sends a shape useFiringTicker doesn't
+      // recognise (and which therefore never lights the device tile).
+      console.warn("[firing] input name extraction failed", {
+        value: frame.value,
+        frame,
+      });
+      return;
+    }
 
     const matching: Mapping[] = mappings.filter(
       (m) =>
@@ -43,7 +52,29 @@ export function useFiringTicker() {
         m.device_id === frame.device_id &&
         m.routes.some((r) => r.input === input)
     );
-    if (matching.length === 0) return;
+    if (matching.length === 0) {
+      // Helps diagnose "Stream shows the rotation but the icon stays idle":
+      // typically the device emits with a different edge_id/device_id (e.g.
+      // an iPad-side bridge tagging events differently) or no Connection
+      // exists for this device yet. Logged with both sides so the mismatch
+      // is visible without instrumenting the server.
+      console.warn("[firing] no matching mapping for input frame", {
+        incoming: {
+          edge_id: frame.edge_id,
+          device_type: frame.device_type,
+          device_id: frame.device_id,
+          input,
+        },
+        candidates: mappings.map((m) => ({
+          mapping_id: m.mapping_id,
+          edge_id: m.edge_id,
+          device_type: m.device_type,
+          device_id: m.device_id,
+          route_inputs: m.routes.map((r) => r.input),
+        })),
+      });
+      return;
+    }
 
     dispatch({
       kind: "fire_mapping",
