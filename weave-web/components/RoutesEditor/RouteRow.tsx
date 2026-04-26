@@ -3,7 +3,6 @@
 import { GripVertical, INPUT_ICON, X } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { Input } from "@/components/ui/input";
 import type { Route } from "@/lib/api";
 import { INPUT_TYPES, INTENT_GROUPS, INTENT_TYPES } from "./vocab";
 
@@ -84,24 +83,27 @@ export function RouteRow({
           mono
         />
       </div>
-      <div className="w-24">
-        <Input
-          type="number"
-          value={damping}
-          disabled={!isRotate}
-          onChange={(e) =>
-            onChange({
-              ...route,
-              params: { damping: Number(e.target.value) },
-            })
-          }
-          title={
-            isRotate ? "Damping factor" : "Damping applies only to `rotate`"
-          }
-          aria-label="Damping"
-          className={!isRotate ? "opacity-60" : undefined}
-        />
-      </div>
+      {isRotate && (
+        <label
+          className="inline-flex items-center gap-1 rounded-md bg-zinc-50 px-2 py-1 font-mono text-[11px] text-zinc-600 ring-1 ring-inset ring-zinc-950/5 focus-within:ring-2 focus-within:ring-blue-500 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10"
+          title="Damping factor (rotate sensitivity)"
+        >
+          <span aria-hidden>damping</span>
+          <input
+            type="number"
+            value={damping}
+            min={1}
+            onChange={(e) =>
+              onChange({
+                ...route,
+                params: { damping: Number(e.target.value) },
+              })
+            }
+            aria-label="Damping"
+            className="w-10 appearance-none border-0 bg-transparent p-0 text-right font-semibold text-zinc-900 outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:text-zinc-100"
+          />
+        </label>
+      )}
       <Button
         type="button"
         plain
