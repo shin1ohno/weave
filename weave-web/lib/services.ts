@@ -11,6 +11,7 @@ const META_PROPERTY_BY_SERVICE: Record<string, string> = {
   roon: "zone",
   hue: "light",
   macos: "output_device",
+  ios_media: "now_playing",
 };
 
 export interface ServiceTarget {
@@ -66,6 +67,13 @@ function extractStatus(
     if (v.active === false) return "idle";
     return null;
   }
+  if (serviceType === "ios_media") {
+    // now_playing payload is `{ state: "playing" | "paused" | "stopped",
+    // title, artist, ... }` (see weave-ios-core::adapter_ios_media).
+    if (v.state === "playing") return "playing";
+    if (v.state === "paused" || v.state === "stopped") return "idle";
+    return null;
+  }
   return null;
 }
 
@@ -82,14 +90,22 @@ function extractLevel(value: unknown): number | null {
 function extractTrack(value: unknown): string | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  const track = v.track ?? v.now_playing;
-  return typeof track === "string" ? track : null;
+  const direct = v.track ?? v.now_playing;
+  if (typeof direct === "string") return direct;
+  // ios_media publishes a structured `now_playing` { title, artist, ... }
+  // payload rather than a single string. Render it as "Title — Artist"
+  // when both are present, falling back to whichever is non-null.
+  const title = typeof v.title === "string" ? v.title : null;
+  const artist = typeof v.artist === "string" ? v.artist : null;
+  if (title && artist) return `${title} — ${artist}`;
+  return title ?? artist;
 }
 
 const DEFAULT_LABELS: Record<string, string> = {
   roon: "Roon",
   hue: "Hue",
   macos: "macOS",
+  ios_media: "Apple Music",
 };
 
 export function summarizeServices(

@@ -7,7 +7,15 @@ import { Field, Label } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
-const SERVICE_TYPES = ["roon", "hue"];
+const SERVICE_TYPES = ["roon", "hue", "ios_media"];
+
+/** The property each service uses as its "one row per target" key.
+ * Mirrors `META_PROPERTY_BY_SERVICE` in `lib/services.ts`. */
+const META_PROPERTY_BY_SERVICE: Record<string, string> = {
+  roon: "zone",
+  hue: "light",
+  ios_media: "now_playing",
+};
 
 interface Props {
   mapping: Mapping;
@@ -24,7 +32,7 @@ export function TargetBlock({ mapping, onUpdate, mode, layout = "full" }: Props)
 
   const knownTargets = useMemo(() => {
     const metaProperty =
-      mapping.service_type === "hue" ? "light" : "zone";
+      META_PROPERTY_BY_SERVICE[mapping.service_type] ?? "zone";
     return serviceStates
       .filter(
         (s) =>
