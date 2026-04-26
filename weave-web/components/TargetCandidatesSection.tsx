@@ -389,6 +389,8 @@ function CandidateRoutesEditor({
                 onChange={(v) => update(i, { ...r, input: v })}
                 options={INPUT_OPTIONS}
                 allowCustom
+                size="sm"
+                mono
               />
             </div>
             <span className="text-zinc-400">→</span>
@@ -399,6 +401,8 @@ function CandidateRoutesEditor({
                 onChange={(v) => update(i, { ...r, intent: v })}
                 options={intentOptions}
                 allowCustom
+                size="sm"
+                mono
               />
             </div>
             <div className="w-20">

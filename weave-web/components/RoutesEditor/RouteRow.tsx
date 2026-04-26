@@ -68,6 +68,8 @@ export function RouteRow({
           onChange={(v) => onChange({ ...route, input: v })}
           options={INPUT_OPTIONS}
           allowCustom
+          size="sm"
+          mono
         />
       </div>
       <span className="text-zinc-400">→</span>
@@ -78,6 +80,8 @@ export function RouteRow({
           onChange={(v) => onChange({ ...route, intent: v })}
           groups={groupsWithCatchAll}
           allowCustom
+          size="sm"
+          mono
         />
       </div>
       <div className="w-24">
