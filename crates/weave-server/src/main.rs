@@ -5,6 +5,7 @@ mod mqtt;
 mod push_broker;
 mod sqlite_store;
 mod state_hub;
+mod web_view;
 mod ws_edge;
 mod ws_ui;
 

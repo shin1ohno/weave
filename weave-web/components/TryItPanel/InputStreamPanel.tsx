@@ -6,6 +6,7 @@ import type { UiFrame, CommandResult, ErrorSeverity } from "@/lib/api";
 import { useWsFrames } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LiveDot } from "@/components/ui/live-dot";
 import {
   Play,
   Pause,
@@ -77,8 +78,9 @@ interface Props {
   /** Max rows to keep. Older rows drop off the top. */
   maxRows?: number;
   /** Controls the table's visual density / chrome. `drawer` fills the
-   * parent; `inline` is sized for embedding inside another panel. */
-  variant?: "drawer" | "inline";
+   * parent; `inline` is sized for embedding inside another panel;
+   * `compact` strips the chip bar for tight side-pane embeds. */
+  variant?: "drawer" | "inline" | "compact";
   /** Optional title override. */
   title?: string;
 }
@@ -409,46 +411,63 @@ export function InputStreamPanel({
       return { ...prev, [facet]: next };
     });
 
+  const isCompact = variant === "compact";
+
   return (
     <div className={clsx("flex flex-col", variant === "drawer" && "h-full")}>
-      <div className="flex items-center gap-2 border-b border-zinc-950/5 px-4 py-3 dark:border-white/10">
-        <span
-          className="h-2 w-2 animate-pulse rounded-full bg-orange-500"
-          aria-hidden
-        />
-        <h3 className="text-sm font-semibold text-zinc-950 dark:text-white">
+      <div
+        className={clsx(
+          "flex items-center gap-2 border-b border-zinc-950/5 dark:border-white/10",
+          isCompact ? "px-3 py-1.5" : "px-4 py-3"
+        )}
+      >
+        <LiveDot color="orange" firing />
+        <h3
+          className={clsx(
+            "font-semibold text-zinc-950 dark:text-white",
+            isCompact ? "text-xs" : "text-sm"
+          )}
+        >
           {title}
         </h3>
         <Badge color="zinc">{visible.length}</Badge>
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            plain
-            onClick={() => setPaused((p) => !p)}
-            aria-label={paused ? "Resume stream" : "Pause stream"}
-          >
-            {paused ? (
-              <Play className="h-3.5 w-3.5" />
-            ) : (
-              <Pause className="h-3.5 w-3.5" />
-            )}
-            {paused ? "Resume" : "Pause"}
-          </Button>
-          <Button plain onClick={clear} aria-label="Clear stream">
-            <X className="h-3.5 w-3.5" />
-            Clear
-          </Button>
-        </div>
+        {!isCompact && (
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              plain
+              onClick={() => setPaused((p) => !p)}
+              aria-label={paused ? "Resume stream" : "Pause stream"}
+            >
+              {paused ? (
+                <Play className="h-3.5 w-3.5" />
+              ) : (
+                <Pause className="h-3.5 w-3.5" />
+              )}
+              {paused ? "Resume" : "Pause"}
+            </Button>
+            <Button plain onClick={clear} aria-label="Clear stream">
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </Button>
+          </div>
+        )}
       </div>
-      <ChipBar
-        facets={facets}
-        chips={chips}
-        toggleKind={toggleKind}
-        toggleFacet={toggleFacet}
-      />
+      {!isCompact && (
+        <ChipBar
+          facets={facets}
+          chips={chips}
+          toggleKind={toggleKind}
+          toggleFacet={toggleFacet}
+        />
+      )}
       <div
         className={clsx(
           "overflow-y-auto font-mono text-[11px]",
-          variant === "drawer" ? "flex-1" : "max-h-60"
+          variant === "drawer"
+            ? "flex-1"
+            : isCompact
+              ? "max-h-[88px]"
+              : "max-h-60"
         )}
       >
         {visible.length === 0 ? (

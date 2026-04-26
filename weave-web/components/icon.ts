@@ -35,6 +35,7 @@ import {
   Send,
   AlertCircle,
   Disc3,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -112,6 +113,7 @@ export {
   Send,
   AlertCircle,
   Disc3,
+  Trash2,
 };
 
 export type { LucideIcon };

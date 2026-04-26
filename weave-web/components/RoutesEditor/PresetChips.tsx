@@ -79,7 +79,7 @@ export function PresetChips({ onApply, currentRoutes }: Props) {
             onClick={() => onApply(p.routes)}
             title={p.description}
             className={clsx(
-              "rounded-md border px-2.5 py-1 text-xs font-medium transition",
+              "rounded-full border px-3 py-1 text-xs font-medium transition",
               active
                 ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
                 : "border-zinc-950/10 bg-white text-zinc-700 hover:border-zinc-950/20 hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-white/5"

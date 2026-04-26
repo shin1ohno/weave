@@ -61,6 +61,12 @@ export interface EdgeInfo {
   version: string;
   capabilities: string[];
   last_seen: string;
+  /** Wifi signal strength as 0-100 percent. `null` until edge-agent reports it. */
+  wifi: number | null;
+  /** Round-trip ms between server and edge. `null` until edge-agent reports it. */
+  latency_ms: number | null;
+  /** True when the edge has finished its `Hello` handshake on the current ws. */
+  connected: boolean;
 }
 
 export interface ServiceStateEntry {

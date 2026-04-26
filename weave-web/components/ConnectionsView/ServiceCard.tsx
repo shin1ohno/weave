@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { Badge } from "@/components/ui/badge";
+import { LiveDot } from "@/components/ui/live-dot";
 import { Play, Lightbulb, Volume2 } from "@/components/icon";
 import type { ServiceSummary, ServiceTarget } from "@/lib/services";
 
@@ -103,6 +104,10 @@ export function ServiceCard({ service, activeTargetId, onPickTarget }: Props) {
           {service.label}
         </div>
         <Badge color={service.running ? "green" : "zinc"}>
+          <LiveDot
+            color={service.running ? "green" : "zinc"}
+            firing={service.running}
+          />
           {service.running ? "running" : "offline"}
         </Badge>
       </div>

@@ -12,6 +12,7 @@ use weave_contracts::{Mapping as ContractMapping, UiFrame};
 use weave_engine::MappingStore;
 
 use crate::ctx::AppCtx;
+use crate::web_view::WebFrame;
 
 pub async fn handler(ws: WebSocketUpgrade, State(ctx): State<AppCtx>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, ctx))
@@ -34,7 +35,7 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
     }
     snapshot.glyphs = ctx.store.list_glyphs().await.unwrap_or_default();
 
-    let first = UiFrame::Snapshot { snapshot };
+    let first = WebFrame::from(UiFrame::Snapshot { snapshot });
     if let Ok(json) = serde_json::to_string(&first) {
         if tx.send(Message::Text(json)).await.is_err() {
             return;
@@ -54,7 +55,8 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
             ev = updates.recv() => {
                 match ev {
                     Ok(frame) => {
-                        let Ok(json) = serde_json::to_string(&frame) else { continue; };
+                        let view = WebFrame::from(frame);
+                        let Ok(json) = serde_json::to_string(&view) else { continue; };
                         if tx.send(Message::Text(json)).await.is_err() {
                             return;
                         }
@@ -74,7 +76,7 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
                                 .collect();
                         }
                         snap.glyphs = ctx.store.list_glyphs().await.unwrap_or_default();
-                        let frame = UiFrame::Snapshot { snapshot: snap };
+                        let frame = WebFrame::from(UiFrame::Snapshot { snapshot: snap });
                         if let Ok(json) = serde_json::to_string(&frame) {
                             if tx.send(Message::Text(json)).await.is_err() {
                                 return;

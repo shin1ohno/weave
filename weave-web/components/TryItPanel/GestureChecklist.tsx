@@ -86,7 +86,14 @@ export function GestureChecklist({ mapping, onAllVerified }: Props) {
           {okCount}/{total} verified
         </Badge>
       </div>
-      <div className="relative h-1 bg-zinc-100 dark:bg-zinc-800">
+      <div
+        className="relative h-2 bg-zinc-100 dark:bg-zinc-800"
+        role="progressbar"
+        aria-label="Gesture verification progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={okCount}
+      >
         <div
           className="absolute inset-y-0 left-0 bg-green-500 transition-all"
           style={{ width: `${total === 0 ? 0 : (okCount / total) * 100}%` }}

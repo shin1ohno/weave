@@ -72,18 +72,20 @@ export function TryItPanel({ mapping, open, onClose }: Props) {
             Close
           </Button>
         </header>
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
           {mapping ? (
             <>
-              <NuimoMirror
-                device={device}
-                firing={firing.has(mapping.mapping_id)}
-              />
-              <div className="flex min-h-0 flex-1 flex-col">
-                <GestureChecklist mapping={mapping} />
-                <div className="border-t border-zinc-950/5 dark:border-white/10">
-                  <InputStreamPanel filter={filter} variant="inline" />
+              <div className="flex min-h-0 flex-1">
+                <NuimoMirror
+                  device={device}
+                  firing={firing.has(mapping.mapping_id)}
+                />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <GestureChecklist mapping={mapping} />
                 </div>
+              </div>
+              <div className="flex-shrink-0 border-t border-zinc-950/5 dark:border-white/10">
+                <InputStreamPanel filter={filter} variant="inline" />
               </div>
             </>
           ) : (
