@@ -5,6 +5,7 @@ mod mqtt;
 mod push_broker;
 mod sqlite_store;
 mod state_hub;
+mod templates;
 mod web_view;
 mod ws_edge;
 mod ws_ui;
@@ -43,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let store = Arc::new(SqliteStore::connect(&database_url).await?);
     tracing::info!(database_url = %database_url, "sqlite store ready");
     glyphs::seed_defaults(&store).await?;
+    templates::seed_builtins(&store).await?;
 
     let engine = Arc::new(RoutingEngine::new());
     let mappings = store.list_mappings().await?;
@@ -95,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
     let app: Router = Router::new()
         .merge(api::router())
         .merge(glyphs::router())
+        .merge(templates::router())
         .route("/ws/edge", get(ws_edge::handler))
         .route("/ws/ui", get(ws_ui::handler))
         .with_state(ctx)

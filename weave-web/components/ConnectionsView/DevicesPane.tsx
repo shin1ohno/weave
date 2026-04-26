@@ -15,7 +15,7 @@ import {
   deviceForMapping,
   summarizeDevices,
 } from "@/lib/devices";
-import { InputStreamPanel } from "@/components/TryItPanel/InputStreamPanel";
+import { InputStreamPanel } from "@/components/InputStreamPanel";
 import { DeviceTile } from "./DeviceTile";
 
 export function DevicesPane() {

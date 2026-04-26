@@ -75,6 +75,9 @@ export function newMappingDraft(overrides: Partial<Mapping> = {}): Mapping {
 export interface UseMappingDraft {
   mapping: Mapping | null;
   loadError: string | null;
+  /** True iff the in-memory `mapping` differs from the load-time
+   *  baseline. False when there's no baseline yet (still loading). */
+  dirty: boolean;
   setMapping: (next: Mapping) => void;
   updateField: <K extends keyof Mapping>(key: K, value: Mapping[K]) => void;
 
@@ -285,10 +288,16 @@ export function useMappingDraft(
     }
   }, [mode, dispatch, onSaved]);
 
+  const dirty =
+    mapping != null &&
+    baselineRef.current != null &&
+    !sameMapping(mapping, baselineRef.current);
+
   return useMemo(
     () => ({
       mapping,
       loadError,
+      dirty,
       setMapping,
       updateField,
       addRoute,
@@ -310,6 +319,7 @@ export function useMappingDraft(
     [
       mapping,
       loadError,
+      dirty,
       setMapping,
       updateField,
       addRoute,

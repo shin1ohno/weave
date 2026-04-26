@@ -8,7 +8,6 @@ import { useCommandUI } from "@/hooks/useCommandUI";
 import { useRowSelection } from "@/hooks/useRowSelection";
 import { useSelectedDevice } from "@/lib/ws";
 import { useTheme } from "@/hooks/useTheme";
-import { useTryIt } from "@/hooks/useTryIt";
 import { summarizeDevices } from "@/lib/devices";
 import { summarizeServices, targetLabel } from "@/lib/services";
 import type { Mapping } from "@/lib/api";
@@ -40,7 +39,6 @@ export function CommandPalette() {
   const { setSelectedId, requestAction } = useRowSelection();
   const [, setSelectedDevice] = useSelectedDevice();
   const { theme, toggle: toggleTheme } = useTheme();
-  const tryIt = useTryIt();
 
   const devices = useMemo(
     () => summarizeDevices(deviceStates, mappings),
@@ -241,16 +239,6 @@ export function CommandPalette() {
                 Switch target · {mappingLabel(m)}
               </PaletteItem>
             ))}
-            {mappings.length > 0 &&
-              mappings.map((m) => (
-                <PaletteItem
-                  key={`tryit:${m.mapping_id}`}
-                  value={`try it ${mappingLabel(m)} ${m.mapping_id}`}
-                  onSelect={() => run(() => tryIt.openFor(m))}
-                >
-                  Try it · {mappingLabel(m)}
-                </PaletteItem>
-              ))}
           </Group>
 
           {edges.length > 0 && (

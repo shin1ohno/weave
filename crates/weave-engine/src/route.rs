@@ -4,7 +4,7 @@ use crate::intents::{Intent, IntentType};
 use crate::primitives::{InputPrimitive, InputType};
 
 /// A single routing rule: input type → intent type with optional parameters.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Route {
     pub input: InputType,
     pub intent: IntentType,
@@ -13,7 +13,7 @@ pub struct Route {
 }
 
 /// Parameters that modify how an input is transformed into an intent.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RouteParams {
     /// Multiplier for continuous values (rotate delta, slide value).
     #[serde(default = "default_damping")]

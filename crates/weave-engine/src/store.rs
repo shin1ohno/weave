@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::mapping::Mapping;
+use crate::template::Template;
 
 /// Trait for persisting mappings.
 #[async_trait::async_trait]
@@ -11,6 +12,15 @@ pub trait MappingStore: Send + Sync + 'static {
     async fn create_mapping(&self, mapping: &Mapping) -> Result<(), StoreError>;
     async fn update_mapping(&self, mapping: &Mapping) -> Result<(), StoreError>;
     async fn delete_mapping(&self, id: &uuid::Uuid) -> Result<bool, StoreError>;
+}
+
+/// Trait for persisting reusable templates (route + feedback bundles).
+#[async_trait::async_trait]
+pub trait TemplateStore: Send + Sync + 'static {
+    async fn list_templates(&self) -> Result<Vec<Template>, StoreError>;
+    async fn get_template(&self, id: &str) -> Result<Option<Template>, StoreError>;
+    async fn upsert_template(&self, t: &Template) -> Result<(), StoreError>;
+    async fn delete_template(&self, id: &str) -> Result<bool, StoreError>;
 }
 
 #[derive(Debug, thiserror::Error)]

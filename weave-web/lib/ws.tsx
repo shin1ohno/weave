@@ -2,11 +2,13 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useReducer,
   useRef,
+  useState,
   ReactNode,
 } from "react";
 import {
@@ -19,6 +21,7 @@ import {
   UiSnapshot,
   wsUrl,
 } from "./api";
+import { listTemplates, type Template } from "./templates";
 
 export type ConnectionsFilter = "all" | "active" | "firing";
 
@@ -332,6 +335,57 @@ const WsListenersContext = createContext<{
   add: (fn: FrameListener) => () => void;
 } | null>(null);
 
+// Templates live in their own context rather than the WS reducer because
+// they are loaded via REST (not part of the `UiSnapshot` frame) and their
+// shape is owned by the editor UI, not the live-state pipeline. Components
+// that mutate templates (create / update / delete) call the API directly
+// and then `setTemplates(next)` to refresh the in-memory list — no WS
+// round-trip required. Keeping this separate also avoids growing the
+// `UIState` reducer with unrelated CRUD plumbing.
+interface TemplatesContextValue {
+  templates: Template[];
+  setTemplates: (next: Template[]) => void;
+}
+
+const TemplatesContext = createContext<TemplatesContextValue | null>(null);
+
+function TemplatesProvider({ children }: { children: ReactNode }) {
+  const [templates, setTemplatesState] = useState<Template[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listTemplates()
+      .then((next) => {
+        if (!cancelled) setTemplatesState(next);
+      })
+      .catch((err) => {
+        // Templates are nice-to-have onboarding sugar; if the endpoint is
+        // missing in dev or returns an error, leave the list empty and
+        // surface the failure in the console rather than blocking the rest
+        // of the UI from rendering.
+        console.warn("listTemplates failed", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setTemplates = useCallback((next: Template[]) => {
+    setTemplatesState(next);
+  }, []);
+
+  const value = useMemo(
+    () => ({ templates, setTemplates }),
+    [templates, setTemplates]
+  );
+
+  return (
+    <TemplatesContext.Provider value={value}>
+      {children}
+    </TemplatesContext.Provider>
+  );
+}
+
 export function UIStateProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, emptyState);
   const wsRef = useRef<WebSocket | null>(null);
@@ -399,7 +453,7 @@ export function UIStateProvider({ children }: { children: ReactNode }) {
   return (
     <UIStateContext.Provider value={{ state, dispatch }}>
       <WsListenersContext.Provider value={listenersApi}>
-        {children}
+        <TemplatesProvider>{children}</TemplatesProvider>
       </WsListenersContext.Provider>
     </UIStateContext.Provider>
   );
@@ -478,6 +532,34 @@ export function useLastInputByDevice(): Record<string, LastInput> {
       "useLastInputByDevice must be used inside UIStateProvider"
     );
   return ctx.state.lastInputByDevice;
+}
+
+/**
+ * Read the current template library. Returns the in-memory list fetched on
+ * mount via `listTemplates()`. Components that mutate (create / delete /
+ * update) should pair this with `useDispatchTemplates` to push the new
+ * list back into the context.
+ */
+export function useTemplates(): Template[] {
+  const ctx = useContext(TemplatesContext);
+  if (!ctx)
+    throw new Error("useTemplates must be used inside UIStateProvider");
+  return ctx.templates;
+}
+
+/**
+ * Setter for the in-memory template list. Components that create / update /
+ * delete via the REST helpers in `lib/templates.ts` call this with the
+ * updated array (typically computed from the previous result) so the rest
+ * of the UI reflects the change without a refetch round-trip.
+ */
+export function useDispatchTemplates(): (next: Template[]) => void {
+  const ctx = useContext(TemplatesContext);
+  if (!ctx)
+    throw new Error(
+      "useDispatchTemplates must be used inside UIStateProvider"
+    );
+  return ctx.setTemplates;
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "@/components/Drawer";
-import { InputStreamPanel } from "@/components/TryItPanel/InputStreamPanel";
+import { InputStreamPanel } from "@/components/InputStreamPanel";
 
 export default function StreamDrawer() {
   return (
