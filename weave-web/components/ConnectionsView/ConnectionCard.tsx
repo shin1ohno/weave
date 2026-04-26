@@ -193,10 +193,7 @@ export function ConnectionCard({
             onClick={() => setExpanded((v) => !v)}
             aria-label={expanded ? "Collapse editor" : "Edit connection"}
             aria-expanded={expanded}
-            className={clsx(
-              "flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 dark:hover:bg-white/5",
-              expanded ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-            )}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100"
           >
             {expanded ? (
               <ChevronDown className="h-3.5 w-3.5" />
@@ -208,7 +205,7 @@ export function ConnectionCard({
             type="button"
             onClick={() => setDeleteOpen(true)}
             aria-label="Delete connection"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
