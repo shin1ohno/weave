@@ -1,13 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Mapping } from "@/lib/api";
 import { useUIState } from "@/lib/ws";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Field, Label } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Lightbulb, Play, SERVICE_ICON, Volume2 } from "@/components/icon";
 
 const SERVICE_TYPES = ["roon", "hue", "ios_media"];
+
+const SERVICE_TYPE_OPTIONS: ComboboxOption[] = SERVICE_TYPES.map((t) => ({
+  value: t,
+  label: t,
+  icon:
+    SERVICE_ICON[t] ??
+    (t === "roon" ? Play : t === "hue" ? Lightbulb : Volume2),
+}));
 
 /** The property each service uses as its "one row per target" key.
  * Mirrors `META_PROPERTY_BY_SERVICE` in `lib/services.ts`. */
@@ -48,16 +57,18 @@ export function TargetBlock({ mapping, onUpdate, mode, layout = "full" }: Props)
       .filter((v, i, a) => a.findIndex((x) => x.target === v.target) === i);
   }, [serviceStates, mapping.service_type]);
 
-  const isKnown = knownTargets.some(
-    (t) => t.target === mapping.service_target
+  const targetOptions: ComboboxOption[] = useMemo(
+    () =>
+      knownTargets.map((t) => ({
+        value: t.target,
+        label: t.label,
+        // Show the raw target id as muted secondary text when it diverges
+        // from the display label — useful when a Roon zone display name
+        // collides between rooms.
+        description: t.target !== t.label ? t.target : undefined,
+      })),
+    [knownTargets]
   );
-  // Preference is nullable: null → infer from the live list; once the user
-  // explicitly toggles we honor their choice until they toggle again.
-  const [userPrefersRaw, setUserPrefersRaw] = useState<boolean | null>(null);
-  const mustUseRaw =
-    knownTargets.length === 0 ||
-    (mapping.service_target !== "" && !isKnown);
-  const useRaw = userPrefersRaw ?? mustUseRaw;
 
   const gridClass =
     layout === "full" ? "grid gap-4 sm:grid-cols-2" : "grid gap-4 grid-cols-1";
@@ -67,16 +78,12 @@ export function TargetBlock({ mapping, onUpdate, mode, layout = "full" }: Props)
       <Field>
         <Label>Service Type</Label>
         {mode === "new" ? (
-          <Select
+          <Combobox
+            aria-label="Service Type"
             value={mapping.service_type}
-            onChange={(e) => onUpdate("service_type", e.target.value)}
-          >
-            {SERVICE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
+            onChange={(v) => onUpdate("service_type", v)}
+            options={SERVICE_TYPE_OPTIONS}
+          />
         ) : (
           <Input
             value={mapping.service_type}
@@ -89,41 +96,19 @@ export function TargetBlock({ mapping, onUpdate, mode, layout = "full" }: Props)
 
       <Field>
         <Label>Service Target</Label>
-        {!useRaw && knownTargets.length > 0 ? (
-          <Select
-            value={mapping.service_target}
-            onChange={(e) => onUpdate("service_target", e.target.value)}
-          >
-            <option value="">— pick —</option>
-            {knownTargets.map((t) => (
-              <option key={t.target} value={t.target}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Input
-            value={mapping.service_target}
-            onChange={(e) => onUpdate("service_target", e.target.value)}
-            className="font-mono"
-          />
-        )}
-        <div className="mt-1 flex items-center gap-2 text-xs">
-          {knownTargets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setUserPrefersRaw(!useRaw)}
-              className="text-blue-600 hover:underline dark:text-blue-400"
-            >
-              {useRaw ? "← pick from list" : "use raw value"}
-            </button>
-          )}
-          {knownTargets.length === 0 && (
-            <span className="text-zinc-500 dark:text-zinc-400">
-              No live targets — enter a raw value.
-            </span>
-          )}
-        </div>
+        <Combobox
+          aria-label="Service Target"
+          value={mapping.service_target}
+          onChange={(v) => onUpdate("service_target", v)}
+          options={targetOptions}
+          allowCustom
+          placeholder="— pick —"
+          emptyState={
+            knownTargets.length === 0
+              ? "No live targets — type a raw value"
+              : undefined
+          }
+        />
       </Field>
     </div>
   );

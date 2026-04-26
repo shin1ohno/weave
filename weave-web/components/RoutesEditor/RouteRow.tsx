@@ -1,15 +1,11 @@
 "use client";
 
-import { GripVertical, X } from "@/components/icon";
+import { GripVertical, INPUT_ICON, X } from "@/components/icon";
 import { Button } from "@/components/ui/button";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import type { Route } from "@/lib/api";
-import {
-  INPUT_TYPES,
-  INTENT_GROUPS,
-  INTENT_TYPES,
-} from "./vocab";
+import { INPUT_TYPES, INTENT_GROUPS, INTENT_TYPES } from "./vocab";
 
 interface Props {
   index: number;
@@ -19,6 +15,17 @@ interface Props {
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
 }
+
+const INPUT_OPTIONS: ComboboxOption[] = INPUT_TYPES.map((t) => ({
+  value: t,
+  label: t,
+  icon: INPUT_ICON[t],
+}));
+
+const INTENT_GROUP_OPTIONS = INTENT_GROUPS.map((g) => ({
+  label: g.label,
+  options: g.items.map((it) => ({ value: it, label: it })),
+}));
 
 export function RouteRow({
   index,
@@ -31,6 +38,20 @@ export function RouteRow({
   const isRotate = route.input === "rotate";
   const damping =
     typeof route.params?.damping === "number" ? route.params.damping : 1;
+
+  // Catch-all so server-defined intents outside the curated groups still
+  // have a row to render. Computed eagerly because Combobox's `groups`
+  // doesn't fall back gracefully if the value points outside any group.
+  const groupsWithCatchAll = !INTENT_TYPES.includes(route.intent)
+    ? [
+        ...INTENT_GROUP_OPTIONS,
+        {
+          label: "Custom",
+          options: [{ value: route.intent, label: route.intent }],
+        },
+      ]
+    : INTENT_GROUP_OPTIONS;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span
@@ -41,39 +62,23 @@ export function RouteRow({
         <GripVertical className="h-3.5 w-3.5" />
       </span>
       <div className="min-w-40">
-        <Select
-          value={route.input}
-          onChange={(e) => onChange({ ...route, input: e.target.value })}
+        <Combobox
           aria-label="Input"
-        >
-          {INPUT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
+          value={route.input}
+          onChange={(v) => onChange({ ...route, input: v })}
+          options={INPUT_OPTIONS}
+          allowCustom
+        />
       </div>
       <span className="text-zinc-400">→</span>
       <div className="min-w-44">
-        <Select
-          value={route.intent}
-          onChange={(e) => onChange({ ...route, intent: e.target.value })}
+        <Combobox
           aria-label="Intent"
-        >
-          {INTENT_GROUPS.map((g) => (
-            <optgroup key={g.label} label={g.label}>
-              {g.items.map((it) => (
-                <option key={it} value={it}>
-                  {it}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-          {/* Catch-all for server-defined intents outside the curated groups */}
-          {!INTENT_TYPES.includes(route.intent) && (
-            <option value={route.intent}>{route.intent}</option>
-          )}
-        </Select>
+          value={route.intent}
+          onChange={(v) => onChange({ ...route, intent: v })}
+          groups={groupsWithCatchAll}
+          allowCustom
+        />
       </div>
       <div className="w-24">
         <Input
