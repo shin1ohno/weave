@@ -437,6 +437,7 @@ export function RoutesEditor({
                 updateRoute(idx, { ...r, params: { ...r.params, damping } })
               }
               duplicate={dupeIds.has(r.id)}
+              deviceType={mapping.device_type}
             />
           ))
         )}
@@ -495,6 +496,7 @@ export function RoutesEditor({
                     }}
                     onClose={() => setShowSwitchGesturePicker(false)}
                     used={new Set(mapping.routes.map((r) => r.input))}
+                    deviceType={mapping.device_type}
                   />
                 )}
               </div>

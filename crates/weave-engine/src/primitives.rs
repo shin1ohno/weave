@@ -67,7 +67,23 @@ pub enum InputType {
     LongTouchBottom,
     LongTouchLeft,
     LongTouchRight,
-    KeyPress { key: u32 },
+    KeyPress {
+        key: u32,
+    },
+    // Numbered buttons. Hue Tap Dial uses 1..=4; other multi-button
+    // controllers reuse the same vocabulary. Wire format is the bare
+    // string `"button_1"` etc. — `rename_all = "snake_case"` would
+    // emit `"button1"` (no separator before the digit), so each
+    // variant carries an explicit `rename` to match `vocab.ts` and
+    // edge-core's `InputPrimitive::Button` string matcher.
+    #[serde(rename = "button_1")]
+    Button1,
+    #[serde(rename = "button_2")]
+    Button2,
+    #[serde(rename = "button_3")]
+    Button3,
+    #[serde(rename = "button_4")]
+    Button4,
 }
 
 impl InputPrimitive {

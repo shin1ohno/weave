@@ -56,6 +56,11 @@ export interface RuleSentenceProps {
   /** True when this gesture is also used by another route — paint the
    *  row rose. */
   duplicate?: boolean;
+  /** Mapping's device_type — drives gesture-picker filtering so a Hue
+   *  Tap Dial sees its numbered buttons and a Nuimo sees rotate / press /
+   *  swipe / touch. Optional so callers without device context degrade
+   *  to the union picker. */
+  deviceType?: string;
 }
 
 export function RuleSentence({
@@ -68,6 +73,7 @@ export function RuleSentence({
   onRemove,
   onParamChange,
   duplicate = false,
+  deviceType,
 }: RuleSentenceProps) {
   const r = route;
   const firing = hot === r.input;
@@ -125,6 +131,7 @@ export function RuleSentence({
             }}
             onClose={() => setOpenPicker(null)}
             used={new Set()}
+            deviceType={deviceType}
           />
         )}
       </div>
