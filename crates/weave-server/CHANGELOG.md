@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.5...weave-server-v0.1.6) - 2026-04-26
+
+### Other
+
+- fix Connection create from LAN hostname; add Nuimo firing diagnostics ([#36](https://github.com/shin1ohno/weave/pull/36))
+
 ## [0.1.5](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.4...weave-server-v0.1.5) - 2026-04-23
 
 ### Other
