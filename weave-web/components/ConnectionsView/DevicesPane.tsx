@@ -35,7 +35,36 @@ export function DevicesPane() {
     for (const m of mappings) {
       if (!firingMappingIds.has(m.mapping_id)) continue;
       const dev = deviceForMapping(devices, m);
-      if (dev) keys.add(deviceKeyString(dev));
+      if (dev) {
+        keys.add(deviceKeyString(dev));
+      } else {
+        // ConnectionCard fires (firingMappingIds populated) but the device
+        // tile stays idle: this branch tells us the mapping's triple doesn't
+        // match any device entry — which would be surprising since
+        // summarizeDevices ensure()s a device per mapping. Logged so we can
+        // see exactly which fields differ.
+        console.warn("[devices-pane] firing mapping has no matching device", {
+          mapping_id: m.mapping_id,
+          mapping_triple: {
+            edge_id: m.edge_id,
+            device_type: m.device_type,
+            device_id: m.device_id,
+          },
+          available_device_keys: devices.map((d) => deviceKeyString(d)),
+        });
+      }
+    }
+    if (firingMappingIds.size > 0 && keys.size === 0) {
+      console.warn("[devices-pane] firingMappingIds has entries but no device key matched", {
+        firing_mapping_ids: Array.from(firingMappingIds),
+        mappings: mappings.map((m) => ({
+          mapping_id: m.mapping_id,
+          edge_id: m.edge_id,
+          device_type: m.device_type,
+          device_id: m.device_id,
+        })),
+        device_keys: devices.map((d) => deviceKeyString(d)),
+      });
     }
     return keys;
   }, [mappings, firingMappingIds, devices]);
