@@ -7,6 +7,8 @@
 //! patches, glyph updates) arrive from `push_broker` and get forwarded to
 //! the edge.
 
+use std::time::{Duration, Instant};
+
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::response::IntoResponse;
@@ -20,6 +22,10 @@ use weave_contracts::{
 use crate::ctx::AppCtx;
 
 const OUTBOX_CAPACITY: usize = 128;
+/// Cadence at which the server pings each edge to measure ws round-trip
+/// latency. Matches the edge-agent's EdgeStatus publish interval so a
+/// dashboard sees both metrics refreshed at roughly the same rate.
+const PING_INTERVAL: Duration = Duration::from_secs(10);
 
 pub async fn handler(ws: WebSocketUpgrade, State(ctx): State<AppCtx>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, ctx))
@@ -29,6 +35,11 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
     let (mut tx, mut rx) = socket.split();
     let (outbox_tx, mut outbox_rx) = mpsc::channel::<ServerToEdge>(OUTBOX_CAPACITY);
     let mut edge_id: Option<String> = None;
+    let mut ping_interval = tokio::time::interval(PING_INTERVAL);
+    // Skip the immediate first tick so we don't ping before the edge has
+    // sent its `Hello`.
+    ping_interval.tick().await;
+    let mut pending_ping_at: Option<Instant> = None;
 
     loop {
         tokio::select! {
@@ -49,6 +60,7 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
                             &mut edge_id,
                             &outbox_tx,
                             &mut tx,
+                            &mut pending_ping_at,
                         )
                         .await
                         {
@@ -66,12 +78,28 @@ async fn handle_socket(socket: WebSocket, ctx: AppCtx) {
                     break;
                 }
             }
+            _ = ping_interval.tick() => {
+                // Only measure RTT once an edge has identified itself; pre-Hello
+                // pings would be unattributable. Skip the cycle if a previous
+                // Ping is still outstanding (drop the older one — the edge is
+                // either slow to respond or the link is half-open and will
+                // be torn down on the next read error).
+                if edge_id.is_none() {
+                    continue;
+                }
+                let Ok(json) = serde_json::to_string(&ServerToEdge::Ping) else { continue; };
+                if tx.send(Message::Text(json)).await.is_err() {
+                    break;
+                }
+                pending_ping_at = Some(Instant::now());
+            }
         }
     }
 
     if let Some(eid) = edge_id {
         ctx.broker.unregister(&eid);
         ctx.hub.mark_offline(&eid);
+        ctx.hub.clear_metrics(&eid);
         tracing::debug!(edge_id = %eid, "edge ws ended");
     }
 }
@@ -82,6 +110,7 @@ async fn handle_edge_text(
     edge_id: &mut Option<String>,
     outbox_tx: &mpsc::Sender<ServerToEdge>,
     tx: &mut futures_util::stream::SplitSink<WebSocket, Message>,
+    pending_ping_at: &mut Option<Instant>,
 ) -> Result<(), ()> {
     let parsed = match serde_json::from_str::<EdgeToServer>(text) {
         Ok(v) => v,
@@ -167,6 +196,25 @@ async fn handle_edge_text(
         }
         EdgeToServer::Pong => {
             tracing::trace!(edge_id = ?edge_id, "pong");
+            if let (Some(eid), Some(sent)) = (edge_id.as_deref(), pending_ping_at.take()) {
+                let rtt_ms = sent.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
+                let metrics = ctx.hub.record_latency(eid, rtt_ms);
+                ctx.hub.broadcast(UiFrame::EdgeStatus {
+                    edge_id: eid.to_string(),
+                    wifi: metrics.wifi,
+                    latency_ms: metrics.latency_ms,
+                });
+            }
+        }
+        EdgeToServer::EdgeStatus { wifi } => {
+            if let Some(eid) = edge_id.as_deref() {
+                let metrics = ctx.hub.record_wifi(eid, wifi);
+                ctx.hub.broadcast(UiFrame::EdgeStatus {
+                    edge_id: eid.to_string(),
+                    wifi: metrics.wifi,
+                    latency_ms: metrics.latency_ms,
+                });
+            }
         }
         EdgeToServer::SwitchTarget {
             mapping_id,

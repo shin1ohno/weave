@@ -156,6 +156,12 @@ export type UiFrame =
       message: string;
       severity: ErrorSeverity;
       at: string;
+    }
+  | {
+      type: "edge_status";
+      edge_id: string;
+      wifi: number | null;
+      latency_ms: number | null;
     };
 
 /** Compute absolute WebSocket URL. Called lazily from client code so that
