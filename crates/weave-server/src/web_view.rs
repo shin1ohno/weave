@@ -22,6 +22,8 @@ use weave_contracts::{
     ServiceStateEntry, UiFrame, UiSnapshot,
 };
 
+use crate::state_hub::{EdgeMetrics, StateHub};
+
 #[derive(Debug, Clone, Serialize)]
 pub struct WebEdge {
     #[serde(flatten)]
@@ -43,6 +45,22 @@ impl From<EdgeInfo> for WebEdge {
     }
 }
 
+impl WebEdge {
+    /// Construct a `WebEdge` whose extension fields reflect the latest
+    /// known metrics for this edge. Used at snapshot time so newly
+    /// connected dashboard clients see current values without waiting
+    /// for the next periodic update.
+    pub fn with_metrics(info: EdgeInfo, metrics: EdgeMetrics) -> Self {
+        let connected = info.online;
+        Self {
+            info,
+            wifi: metrics.wifi,
+            latency_ms: metrics.latency_ms,
+            connected,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct WebSnapshot {
     pub edges: Vec<WebEdge>,
@@ -56,6 +74,31 @@ impl From<UiSnapshot> for WebSnapshot {
     fn from(s: UiSnapshot) -> Self {
         Self {
             edges: s.edges.into_iter().map(WebEdge::from).collect(),
+            service_states: s.service_states,
+            device_states: s.device_states,
+            mappings: s.mappings,
+            glyphs: s.glyphs,
+        }
+    }
+}
+
+impl WebSnapshot {
+    /// Build a `WebSnapshot` whose `edges` carry the latest known
+    /// metrics from `hub`. Use this for initial-connect and
+    /// lag-recovery snapshots so a dashboard sees current wifi /
+    /// latency immediately rather than `null` until the next periodic
+    /// update.
+    pub fn build_with_metrics(s: UiSnapshot, hub: &StateHub) -> Self {
+        let edges = s
+            .edges
+            .into_iter()
+            .map(|info| {
+                let metrics = hub.metrics(&info.edge_id);
+                WebEdge::with_metrics(info, metrics)
+            })
+            .collect();
+        Self {
+            edges,
             service_states: s.service_states,
             device_states: s.device_states,
             mappings: s.mappings,
@@ -120,6 +163,11 @@ pub enum WebFrame {
         message: String,
         severity: ErrorSeverity,
         at: String,
+    },
+    EdgeStatus {
+        edge_id: String,
+        wifi: Option<u8>,
+        latency_ms: Option<u32>,
     },
 }
 
@@ -202,6 +250,15 @@ impl From<UiFrame> for WebFrame {
                 message,
                 severity,
                 at,
+            },
+            UiFrame::EdgeStatus {
+                edge_id,
+                wifi,
+                latency_ms,
+            } => WebFrame::EdgeStatus {
+                edge_id,
+                wifi,
+                latency_ms,
             },
         }
     }

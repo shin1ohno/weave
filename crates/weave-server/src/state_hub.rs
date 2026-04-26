@@ -31,6 +31,16 @@ struct DeviceKey {
     property: String,
 }
 
+/// Latest known wifi / latency for one edge. Populated by
+/// `record_wifi` (edge-reported) and `record_latency`
+/// (server-measured Ping/Pong RTT). Both fields are `None` until the
+/// corresponding source emits its first value.
+#[derive(Debug, Clone, Default)]
+pub struct EdgeMetrics {
+    pub wifi: Option<u8>,
+    pub latency_ms: Option<u32>,
+}
+
 pub struct StateHub {
     inner: RwLock<Inner>,
     tx: broadcast::Sender<UiFrame>,
@@ -40,6 +50,7 @@ struct Inner {
     edges: HashMap<String, EdgeInfo>,
     service_states: HashMap<ServiceKey, (serde_json::Value, String)>,
     device_states: HashMap<DeviceKey, (serde_json::Value, String)>,
+    edge_metrics: HashMap<String, EdgeMetrics>,
 }
 
 impl Default for StateHub {
@@ -56,6 +67,7 @@ impl StateHub {
                 edges: HashMap::new(),
                 service_states: HashMap::new(),
                 device_states: HashMap::new(),
+                edge_metrics: HashMap::new(),
             }),
             tx,
         }
@@ -192,5 +204,38 @@ impl StateHub {
     /// Fan-out frame emitted by non-state sources (mapping/glyph CRUD).
     pub fn broadcast(&self, frame: UiFrame) {
         let _ = self.tx.send(frame);
+    }
+
+    /// Read the current metrics for one edge. Returns the default
+    /// (`None` for both fields) when nothing has been recorded yet.
+    pub fn metrics(&self, edge_id: &str) -> EdgeMetrics {
+        let g = self.inner.read().unwrap();
+        g.edge_metrics.get(edge_id).cloned().unwrap_or_default()
+    }
+
+    /// Record an edge-reported wifi reading. Returns the updated
+    /// metrics so callers can fan-out the merged shape.
+    pub fn record_wifi(&self, edge_id: &str, wifi: Option<u8>) -> EdgeMetrics {
+        let mut g = self.inner.write().unwrap();
+        let entry = g.edge_metrics.entry(edge_id.to_string()).or_default();
+        entry.wifi = wifi;
+        entry.clone()
+    }
+
+    /// Record a server-measured Ping/Pong RTT. Returns the updated
+    /// metrics so callers can fan-out the merged shape.
+    pub fn record_latency(&self, edge_id: &str, latency_ms: u32) -> EdgeMetrics {
+        let mut g = self.inner.write().unwrap();
+        let entry = g.edge_metrics.entry(edge_id.to_string()).or_default();
+        entry.latency_ms = Some(latency_ms);
+        entry.clone()
+    }
+
+    /// Drop the metrics row for an edge (called on disconnect so a
+    /// reconnecting edge starts with a clean slate rather than stale
+    /// last-seen values).
+    pub fn clear_metrics(&self, edge_id: &str) {
+        let mut g = self.inner.write().unwrap();
+        g.edge_metrics.remove(edge_id);
     }
 }

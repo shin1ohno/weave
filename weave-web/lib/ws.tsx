@@ -289,6 +289,20 @@ function reducer(state: UIState, action: Action): UIState {
         }
         case "glyphs_changed":
           return { ...state, glyphs: frame.glyphs };
+        case "edge_status": {
+          // Patch the matching edge row in place. If the edge isn't in
+          // the snapshot yet (race during initial connect), drop the
+          // frame — the next snapshot will carry both identity and
+          // metrics together.
+          let touched = false;
+          const edges = state.edges.map((e) => {
+            if (e.edge_id !== frame.edge_id) return e;
+            touched = true;
+            return { ...e, wifi: frame.wifi, latency_ms: frame.latency_ms };
+          });
+          if (!touched) return state;
+          return { ...state, edges };
+        }
         default:
           return state;
       }
