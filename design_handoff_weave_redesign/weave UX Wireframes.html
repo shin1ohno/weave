@@ -1,0 +1,1743 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>weave · UX Wireframes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=Kalam:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1a1714;
+    --ink-2:#4a443d;
+    --ink-3:#8a8278;
+    --paper:#f6f2ea;
+    --paper-2:#ede7da;
+    --line:#1a1714;
+    --accent:#c94a26;
+    --accent-2:#2d6a9f;
+    --accent-3:#d4a017;
+    --live:#3a8a3a;
+    --hand:'Kalam', 'Caveat', cursive;
+    --title:'Caveat', cursive;
+    --mono:'JetBrains Mono', monospace;
+  }
+  html,body{margin:0;background:#e8e3d6;color:var(--ink);font-family:var(--hand);}
+  /* sketch primitives */
+  .sk{background:var(--paper);border:1.5px solid var(--line);border-radius:6px;position:relative;}
+  .sk.rough{border-radius:8px;box-shadow: 1px 2px 0 rgba(0,0,0,.08);}
+  .sk.dash{border-style:dashed;}
+  .sk-pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1.5px solid var(--line);border-radius:999px;background:var(--paper);font-family:var(--hand);font-size:14px;line-height:1.1;}
+  .sk-pill.accent{background:#fde5dc;}
+  .sk-pill.live{background:#d9ecd9;}
+  .sk-pill.ghost{background:transparent;border-style:dashed;color:var(--ink-2);}
+  .sk-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);font-family:var(--hand);font-size:15px;cursor:pointer;box-shadow:1.5px 1.5px 0 var(--line);}
+  .sk-btn.filled{background:var(--ink);color:var(--paper);}
+  .sk-btn.accent{background:var(--accent);color:#fff;border-color:var(--line);}
+  .sk-inp{border:1.5px solid var(--line);border-radius:4px;background:#fffdf7;padding:2px 8px;font-family:var(--hand);font-size:14px;}
+  .mono{font-family:var(--mono);font-size:11px;color:var(--ink-2);}
+  .title{font-family:var(--title);font-weight:700;}
+  .cap{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);}
+  .hr{border:none;border-top:1.5px solid var(--line);margin:6px 0;}
+  .hr.dash{border-top-style:dashed;}
+  .ann{position:absolute;font-family:var(--title);color:var(--accent);font-size:16px;pointer-events:none;line-height:1;}
+  .ann.num{background:var(--accent);color:#fff;border-radius:999px;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;}
+  .arrow{stroke:var(--accent);stroke-width:1.8;fill:none;}
+  .arrow-head{fill:var(--accent);}
+  .ink{stroke:var(--line);stroke-width:1.5;fill:none;}
+  .dim{color:var(--ink-3);}
+  .k{font-family:var(--mono);font-size:10.5px;background:#fffdf7;border:1px solid var(--line);border-radius:3px;padding:1px 4px;}
+  .led-dot{width:6px;height:6px;border-radius:50%;background:var(--ink);display:inline-block;}
+  .led-dot.off{background:transparent;border:1px solid var(--ink-3);}
+  /* Sketch hand-drawn box using pseudo to avoid svg noise overkill */
+  .sketchbox{position:relative;}
+  .sketchbox::before{
+    content:"";position:absolute;inset:-2px;border:1.5px solid var(--line);border-radius:8px;
+    background:transparent;transform:rotate(-.3deg);pointer-events:none;
+  }
+  /* intro */
+  .intro-card{background:#fffdf7;border:1.5px solid var(--line);border-radius:10px;padding:24px 28px;box-shadow: 3px 4px 0 rgba(0,0,0,.1);}
+  .chip{display:inline-block;padding:2px 8px;border:1.5px solid var(--line);border-radius:6px;background:#fffdf7;font-size:13px;}
+  /* device glyphs/icons */
+  .glyph9{display:grid;grid-template-columns:repeat(9,5px);grid-auto-rows:5px;gap:1px;padding:3px;background:var(--ink);border-radius:3px;}
+  .glyph9 .p{background:var(--paper);}
+  .glyph9 .o{background:transparent;}
+  .nuimo{width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);background:#fffdf7;display:flex;align-items:center;justify-content:center;position:relative;}
+  .nuimo::after{content:"";width:34px;height:34px;border-radius:50%;border:1px dashed var(--ink-3);position:absolute;}
+  /* wiggle divider */
+  .wiggle{height:8px;background:
+    radial-gradient(circle at 6px 4px, var(--line) 1px, transparent 1.2px) 0 0/12px 8px;
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+/* ===== design-canvas.jsx ===== */
+
+// DesignCanvas.jsx — Figma-ish design canvas wrapper
+// Warm gray grid bg + Sections + Artboards + PostIt notes.
+// Artboards are reorderable (grip-drag), labels/titles are inline-editable,
+// and any artboard can be opened in a fullscreen focus overlay (←/→/Esc).
+// State persists to a .design-canvas.state.json sidecar via the host
+// bridge. No assets, no deps.
+//
+// Usage:
+//   <DesignCanvas>
+//     <DCSection id="onboarding" title="Onboarding" subtitle="First-run variants">
+//       <DCArtboard id="a" label="A · Dusk" width={260} height={480}>…</DCArtboard>
+//       <DCArtboard id="b" label="B · Minimal" width={260} height={480}>…</DCArtboard>
+//     </DCSection>
+//   </DesignCanvas>
+
+const DC = {
+  bg: '#f0eee9',
+  grid: 'rgba(0,0,0,0.06)',
+  label: 'rgba(60,50,40,0.7)',
+  title: 'rgba(40,30,20,0.85)',
+  subtitle: 'rgba(60,50,40,0.6)',
+  postitBg: '#fef4a8',
+  postitText: '#5a4a2a',
+  font: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+};
+
+// One-time CSS injection (classes are dc-prefixed so they don't collide with
+// the hosted design's own styles).
+if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
+  const s = document.createElement('style');
+  s.id = 'dc-styles';
+  s.textContent = [
+    '.dc-editable{cursor:text;outline:none;white-space:nowrap;border-radius:3px;padding:0 2px;margin:0 -2px}',
+    '.dc-editable:focus{background:#fff;box-shadow:0 0 0 1.5px #c96442}',
+    '[data-dc-slot]{transition:transform .18s cubic-bezier(.2,.7,.3,1)}',
+    '[data-dc-slot].dc-dragging{transition:none;z-index:10;pointer-events:none}',
+    '[data-dc-slot].dc-dragging .dc-card{box-shadow:0 12px 40px rgba(0,0,0,.25),0 0 0 2px #c96442;transform:scale(1.02)}',
+    '.dc-card{transition:box-shadow .15s,transform .15s}',
+    '.dc-card *{scrollbar-width:none}',
+    '.dc-card *::-webkit-scrollbar{display:none}',
+    '.dc-labelrow{display:flex;align-items:center;gap:4px;height:24px}',
+    '.dc-grip{cursor:grab;display:flex;align-items:center;padding:5px 4px;border-radius:4px;transition:background .12s}',
+    '.dc-grip:hover{background:rgba(0,0,0,.08)}',
+    '.dc-grip:active{cursor:grabbing}',
+    '.dc-labeltext{cursor:pointer;border-radius:4px;padding:3px 6px;display:flex;align-items:center;transition:background .12s}',
+    '.dc-labeltext:hover{background:rgba(0,0,0,.05)}',
+    '.dc-expand{position:absolute;bottom:100%;right:0;margin-bottom:5px;z-index:2;opacity:0;transition:opacity .12s,background .12s;',
+    '  width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;padding:0;',
+    '  background:transparent;color:rgba(60,50,40,.7);display:flex;align-items:center;justify-content:center}',
+    '.dc-expand:hover{background:rgba(0,0,0,.06);color:#2a251f}',
+    '[data-dc-slot]:hover .dc-expand{opacity:1}',
+  ].join('\n');
+  document.head.appendChild(s);
+}
+
+const DCCtx = React.createContext(null);
+
+// ─────────────────────────────────────────────────────────────
+// DesignCanvas — stateful wrapper around the pan/zoom viewport.
+// Owns runtime state (per-section order, renamed titles/labels, focused
+// artboard). Order/titles/labels persist to a .design-canvas.state.json
+// sidecar next to the HTML. Reads go via plain fetch() so the saved
+// arrangement is visible anywhere the HTML + sidecar are served together
+// (omelette preview, direct link, downloaded zip). Writes go through the
+// host's window.omelette bridge — editing requires the omelette runtime.
+// Focus is ephemeral.
+// ─────────────────────────────────────────────────────────────
+const DC_STATE_FILE = '.design-canvas.state.json';
+
+function DesignCanvas({ children, minScale, maxScale, style }) {
+  const [state, setState] = React.useState({ sections: {}, focus: null });
+  // Hold rendering until the sidecar read settles so the saved order/titles
+  // appear on first paint (no source-order flash). didRead gates writes until
+  // the read settles so the empty initial state can't clobber a slow read;
+  // skipNextWrite suppresses the one echo-write that would otherwise follow
+  // hydration.
+  const [ready, setReady] = React.useState(false);
+  const didRead = React.useRef(false);
+  const skipNextWrite = React.useRef(false);
+
+  React.useEffect(() => {
+    let off = false;
+    fetch('./' + DC_STATE_FILE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((saved) => {
+        if (off || !saved || !saved.sections) return;
+        skipNextWrite.current = true;
+        setState((s) => ({ ...s, sections: saved.sections }));
+      })
+      .catch(() => {})
+      .finally(() => { didRead.current = true; if (!off) setReady(true); });
+    const t = setTimeout(() => { if (!off) setReady(true); }, 150);
+    return () => { off = true; clearTimeout(t); };
+  }, []);
+
+  React.useEffect(() => {
+    if (!didRead.current) return;
+    if (skipNextWrite.current) { skipNextWrite.current = false; return; }
+    const t = setTimeout(() => {
+      window.omelette?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections })).catch(() => {});
+    }, 250);
+    return () => clearTimeout(t);
+  }, [state.sections]);
+
+  // Build registries synchronously from children so FocusOverlay can read
+  // them in the same render. Only direct DCSection > DCArtboard children are
+  // walked — wrapping them in other elements opts out of focus/reorder.
+  const registry = {};     // slotId -> { sectionId, artboard }
+  const sectionMeta = {};  // sectionId -> { title, subtitle, slotIds[] }
+  const sectionOrder = [];
+  React.Children.forEach(children, (sec) => {
+    if (!sec || sec.type !== DCSection) return;
+    const sid = sec.props.id ?? sec.props.title;
+    if (!sid) return;
+    sectionOrder.push(sid);
+    const persisted = state.sections[sid] || {};
+    const srcIds = [];
+    React.Children.forEach(sec.props.children, (ab) => {
+      if (!ab || ab.type !== DCArtboard) return;
+      const aid = ab.props.id ?? ab.props.label;
+      if (!aid) return;
+      registry[`${sid}/${aid}`] = { sectionId: sid, artboard: ab };
+      srcIds.push(aid);
+    });
+    const kept = (persisted.order || []).filter((k) => srcIds.includes(k));
+    sectionMeta[sid] = {
+      title: persisted.title ?? sec.props.title,
+      subtitle: sec.props.subtitle,
+      slotIds: [...kept, ...srcIds.filter((k) => !kept.includes(k))],
+    };
+  });
+
+  const api = React.useMemo(() => ({
+    state,
+    section: (id) => state.sections[id] || {},
+    patchSection: (id, p) => setState((s) => ({
+      ...s,
+      sections: { ...s.sections, [id]: { ...s.sections[id], ...(typeof p === 'function' ? p(s.sections[id] || {}) : p) } },
+    })),
+    setFocus: (slotId) => setState((s) => ({ ...s, focus: slotId })),
+  }), [state]);
+
+  // Esc exits focus; any outside pointerdown commits an in-progress rename.
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') api.setFocus(null); };
+    const onPd = (e) => {
+      const ae = document.activeElement;
+      if (ae && ae.isContentEditable && !ae.contains(e.target)) ae.blur();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPd, true);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPd, true);
+    };
+  }, [api]);
+
+  return (
+    <DCCtx.Provider value={api}>
+      <DCViewport minScale={minScale} maxScale={maxScale} style={style}>{ready && children}</DCViewport>
+      {state.focus && registry[state.focus] && (
+        <DCFocusOverlay entry={registry[state.focus]} sectionMeta={sectionMeta} sectionOrder={sectionOrder} />
+      )}
+    </DCCtx.Provider>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCViewport — transform-based pan/zoom (internal)
+//
+// Input mapping (Figma-style):
+//   • trackpad pinch  → zoom   (ctrlKey wheel; Safari gesture* events)
+//   • trackpad scroll → pan    (two-finger)
+//   • mouse wheel     → zoom   (notched; distinguished from trackpad scroll)
+//   • middle-drag / primary-drag-on-bg → pan
+//
+// Transform state lives in a ref and is written straight to the DOM
+// (translate3d + will-change) so wheel ticks don't go through React —
+// keeps pans at 60fps on dense canvases.
+// ─────────────────────────────────────────────────────────────
+function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
+  const vpRef = React.useRef(null);
+  const worldRef = React.useRef(null);
+  const tf = React.useRef({ x: 0, y: 0, scale: 1 });
+
+  const apply = React.useCallback(() => {
+    const { x, y, scale } = tf.current;
+    const el = worldRef.current;
+    if (el) el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+  }, []);
+
+  React.useEffect(() => {
+    const vp = vpRef.current;
+    if (!vp) return;
+
+    const zoomAt = (cx, cy, factor) => {
+      const r = vp.getBoundingClientRect();
+      const px = cx - r.left, py = cy - r.top;
+      const t = tf.current;
+      const next = Math.min(maxScale, Math.max(minScale, t.scale * factor));
+      const k = next / t.scale;
+      // keep the world point under the cursor fixed
+      t.x = px - (px - t.x) * k;
+      t.y = py - (py - t.y) * k;
+      t.scale = next;
+      apply();
+    };
+
+    // Mouse-wheel vs trackpad-scroll heuristic. A physical wheel sends
+    // line-mode deltas (Firefox) or large integer pixel deltas with no X
+    // component (Chrome/Safari, typically multiples of 100/120). Trackpad
+    // two-finger scroll sends small/fractional pixel deltas, often with
+    // non-zero deltaX. ctrlKey is set by the browser for trackpad pinch.
+    const isMouseWheel = (e) =>
+      e.deltaMode !== 0 ||
+      (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 40);
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      if (isGesturing) return; // Safari: gesture* owns the pinch — discard concurrent wheels
+      if (e.ctrlKey) {
+        // trackpad pinch (or explicit ctrl+wheel)
+        zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+      } else if (isMouseWheel(e)) {
+        // notched mouse wheel — fixed-ratio step per click
+        zoomAt(e.clientX, e.clientY, Math.exp(-Math.sign(e.deltaY) * 0.18));
+      } else {
+        // trackpad two-finger scroll — pan
+        tf.current.x -= e.deltaX;
+        tf.current.y -= e.deltaY;
+        apply();
+      }
+    };
+
+    // Safari sends native gesture* events for trackpad pinch with a smooth
+    // e.scale; preferring these over the ctrl+wheel fallback gives a much
+    // better feel there. No-ops on other browsers. Safari also fires
+    // ctrlKey wheel events during the same pinch — isGesturing makes
+    // onWheel drop those entirely so they neither zoom nor pan.
+    let gsBase = 1;
+    let isGesturing = false;
+    const onGestureStart = (e) => { e.preventDefault(); isGesturing = true; gsBase = tf.current.scale; };
+    const onGestureChange = (e) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, (gsBase * e.scale) / tf.current.scale);
+    };
+    const onGestureEnd = (e) => { e.preventDefault(); isGesturing = false; };
+
+    // Drag-pan: middle button anywhere, or primary button on canvas
+    // background (anything that isn't an artboard or an inline editor).
+    let drag = null;
+    const onPointerDown = (e) => {
+      const onBg = !e.target.closest('[data-dc-slot], .dc-editable');
+      if (!(e.button === 1 || (e.button === 0 && onBg))) return;
+      e.preventDefault();
+      vp.setPointerCapture(e.pointerId);
+      drag = { id: e.pointerId, lx: e.clientX, ly: e.clientY };
+      vp.style.cursor = 'grabbing';
+    };
+    const onPointerMove = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      tf.current.x += e.clientX - drag.lx;
+      tf.current.y += e.clientY - drag.ly;
+      drag.lx = e.clientX; drag.ly = e.clientY;
+      apply();
+    };
+    const onPointerUp = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      vp.releasePointerCapture(e.pointerId);
+      drag = null;
+      vp.style.cursor = '';
+    };
+
+    vp.addEventListener('wheel', onWheel, { passive: false });
+    vp.addEventListener('gesturestart', onGestureStart, { passive: false });
+    vp.addEventListener('gesturechange', onGestureChange, { passive: false });
+    vp.addEventListener('gestureend', onGestureEnd, { passive: false });
+    vp.addEventListener('pointerdown', onPointerDown);
+    vp.addEventListener('pointermove', onPointerMove);
+    vp.addEventListener('pointerup', onPointerUp);
+    vp.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('gesturestart', onGestureStart);
+      vp.removeEventListener('gesturechange', onGestureChange);
+      vp.removeEventListener('gestureend', onGestureEnd);
+      vp.removeEventListener('pointerdown', onPointerDown);
+      vp.removeEventListener('pointermove', onPointerMove);
+      vp.removeEventListener('pointerup', onPointerUp);
+      vp.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [apply, minScale, maxScale]);
+
+  const gridSvg = `url("data:image/svg+xml,%3Csvg width='120' height='120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M120 0H0v120' fill='none' stroke='${encodeURIComponent(DC.grid)}' stroke-width='1'/%3E%3C/svg%3E")`;
+  return (
+    <div
+      ref={vpRef}
+      className="design-canvas"
+      style={{
+        height: '100vh', width: '100vw',
+        background: DC.bg,
+        overflow: 'hidden',
+        overscrollBehavior: 'none',
+        touchAction: 'none',
+        position: 'relative',
+        fontFamily: DC.font,
+        boxSizing: 'border-box',
+        ...style,
+      }}
+    >
+      <div
+        ref={worldRef}
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          transformOrigin: '0 0',
+          willChange: 'transform',
+          width: 'max-content', minWidth: '100%',
+          minHeight: '100%',
+          padding: '60px 0 80px',
+        }}
+      >
+        <div style={{ position: 'absolute', inset: -6000, backgroundImage: gridSvg, backgroundSize: '120px 120px', pointerEvents: 'none', zIndex: -1 }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DCSection — editable title + h-row of artboards in persisted order
+// ─────────────────────────────────────────────────────────────
+function DCSection({ id, title, subtitle, children, gap = 48 }) {
+  const ctx = React.useContext(DCCtx);
+  const sid = id ?? title;
+  const all = React.Children.toArray(children);
+  const artboards = all.filter((c) => c && c.type === DCArtboard);
+  const rest = all.filter((c) => !(c && c.type === DCArtboard));
+  const srcOrder = artboards.map((a) => a.props.id ?? a.props.label);
+  const sec = (ctx && sid && ctx.section(sid)) || {};
+
+  const order = React.useMemo(() => {
+    const kept = (sec.order || []).filter((k) => srcOrder.includes(k));
+    return [...kept, ...srcOrder.filter((k) => !kept.includes(k))];
+  }, [sec.order, srcOrder.join('|')]);
+
+  const byId = Object.fromEntries(artboards.map((a) => [a.props.id ?? a.props.label, a]));
+
+  return (
+    <div data-dc-section={sid} style={{ marginBottom: 80, position: 'relative' }}>
+      <div style={{ padding: '0 60px 56px' }}>
+        <DCEditable tag="div" value={sec.title ?? title}
+          onChange={(v) => ctx && sid && ctx.patchSection(sid, { title: v })}
+          style={{ fontSize: 28, fontWeight: 600, color: DC.title, letterSpacing: -0.4, marginBottom: 6, display: 'inline-block' }} />
+        {subtitle && <div style={{ fontSize: 16, color: DC.subtitle }}>{subtitle}</div>}
+      </div>
+      <div style={{ display: 'flex', gap, padding: '0 60px', alignItems: 'flex-start', width: 'max-content' }}>
+        {order.map((k) => (
+          <DCArtboardFrame key={k} sectionId={sid} artboard={byId[k]} order={order}
+            label={(sec.labels || {})[k] ?? byId[k].props.label}
+            onRename={(v) => ctx && ctx.patchSection(sid, (x) => ({ labels: { ...x.labels, [k]: v } }))}
+            onReorder={(next) => ctx && ctx.patchSection(sid, { order: next })}
+            onFocus={() => ctx && ctx.setFocus(`${sid}/${k}`)} />
+        ))}
+      </div>
+      {rest}
+    </div>
+  );
+}
+
+// DCArtboard — marker; rendered by DCArtboardFrame via DCSection.
+function DCArtboard() { return null; }
+
+function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorder, onFocus }) {
+  const { id: rawId, label: rawLabel, width = 260, height = 480, children, style = {} } = artboard.props;
+  const id = rawId ?? rawLabel;
+  const ref = React.useRef(null);
+
+  // Live drag-reorder: dragged card sticks to cursor; siblings slide into
+  // their would-be slots in real time via transforms. DOM order only
+  // changes on drop.
+  const onGripDown = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const me = ref.current;
+    // translateX is applied in local (pre-scale) space but pointer deltas and
+    // getBoundingClientRect().left are screen-space — divide by the viewport's
+    // current scale so the dragged card tracks the cursor at any zoom level.
+    const scale = me.getBoundingClientRect().width / me.offsetWidth || 1;
+    const peers = Array.from(document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`));
+    const homes = peers.map((el) => ({ el, id: el.dataset.dcSlot, x: el.getBoundingClientRect().left }));
+    const slotXs = homes.map((h) => h.x);
+    const startIdx = order.indexOf(id);
+    const startX = e.clientX;
+    let liveOrder = order.slice();
+    me.classList.add('dc-dragging');
+
+    const layout = () => {
+      for (const h of homes) {
+        if (h.id === id) continue;
+        const slot = liveOrder.indexOf(h.id);
+        h.el.style.transform = `translateX(${(slotXs[slot] - h.x) / scale}px)`;
+      }
+    };
+
+    const move = (ev) => {
+      const dx = ev.clientX - startX;
+      me.style.transform = `translateX(${dx / scale}px)`;
+      const cur = homes[startIdx].x + dx;
+      let nearest = 0, best = Infinity;
+      for (let i = 0; i < slotXs.length; i++) {
+        const d = Math.abs(slotXs[i] - cur);
+        if (d < best) { best = d; nearest = i; }
+      }
+      if (liveOrder.indexOf(id) !== nearest) {
+        liveOrder = order.filter((k) => k !== id);
+        liveOrder.splice(nearest, 0, id);
+        layout();
+      }
+    };
+
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const finalSlot = liveOrder.indexOf(id);
+      me.classList.remove('dc-dragging');
+      me.style.transform = `translateX(${(slotXs[finalSlot] - homes[startIdx].x) / scale}px)`;
+      // After the settle transition, kill transitions + clear transforms +
+      // commit the reorder in the same frame so there's no visual snap-back.
+      setTimeout(() => {
+        for (const h of homes) { h.el.style.transition = 'none'; h.el.style.transform = ''; }
+        if (liveOrder.join('|') !== order.join('|')) onReorder(liveOrder);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          for (const h of homes) h.el.style.transition = '';
+        }));
+      }, 180);
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  };
+
+  return (
+    <div ref={ref} data-dc-slot={id} style={{ position: 'relative', flexShrink: 0 }}>
+      <div className="dc-labelrow" style={{ position: 'absolute', bottom: '100%', left: -4, marginBottom: 4, color: DC.label }}>
+        <div className="dc-grip" onPointerDown={onGripDown} title="Drag to reorder">
+          <svg width="9" height="13" viewBox="0 0 9 13" fill="currentColor"><circle cx="2" cy="2" r="1.1"/><circle cx="7" cy="2" r="1.1"/><circle cx="2" cy="6.5" r="1.1"/><circle cx="7" cy="6.5" r="1.1"/><circle cx="2" cy="11" r="1.1"/><circle cx="7" cy="11" r="1.1"/></svg>
+        </div>
+        <div className="dc-labeltext" onClick={onFocus} title="Click to focus">
+          <DCEditable value={label} onChange={onRename} onClick={(e) => e.stopPropagation()}
+            style={{ fontSize: 15, fontWeight: 500, color: DC.label, lineHeight: 1 }} />
+        </div>
+      </div>
+      <button className="dc-expand" onClick={onFocus} onPointerDown={(e) => e.stopPropagation()} title="Focus">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M7 1h4v4M5 11H1V7M11 1L7.5 4.5M1 11l3.5-3.5"/></svg>
+      </button>
+      <div className="dc-card"
+        style={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.06)', overflow: 'hidden', width, height, background: '#fff', ...style }}>
+        {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb', fontSize: 13, fontFamily: DC.font }}>{id}</div>}
+      </div>
+    </div>
+  );
+}
+
+// Inline rename — commits on blur or Enter.
+function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
+  const T = tag;
+  return (
+    <T className="dc-editable" contentEditable suppressContentEditableWarning
+      onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
+      onBlur={(e) => onChange && onChange(e.currentTarget.textContent)}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+      style={style}>{value}</T>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Focus mode — overlay one artboard; ←/→ within section, ↑/↓ across
+// sections, Esc or backdrop click to exit.
+// ─────────────────────────────────────────────────────────────
+function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
+  const ctx = React.useContext(DCCtx);
+  const { sectionId, artboard } = entry;
+  const sec = ctx.section(sectionId);
+  const meta = sectionMeta[sectionId];
+  const peers = meta.slotIds;
+  const aid = artboard.props.id ?? artboard.props.label;
+  const idx = peers.indexOf(aid);
+  const secIdx = sectionOrder.indexOf(sectionId);
+
+  const go = (d) => { const n = peers[(idx + d + peers.length) % peers.length]; if (n) ctx.setFocus(`${sectionId}/${n}`); };
+  const goSection = (d) => {
+    const ns = sectionOrder[(secIdx + d + sectionOrder.length) % sectionOrder.length];
+    const first = sectionMeta[ns] && sectionMeta[ns].slotIds[0];
+    if (first) ctx.setFocus(`${ns}/${first}`);
+  };
+
+  React.useEffect(() => {
+    const k = (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); goSection(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); goSection(1); }
+    };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  });
+
+  const { width = 260, height = 480, children } = artboard.props;
+  const [vp, setVp] = React.useState({ w: window.innerWidth, h: window.innerHeight });
+  React.useEffect(() => { const r = () => setVp({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  const scale = Math.max(0.1, Math.min((vp.w - 200) / width, (vp.h - 260) / height, 2));
+
+  const [ddOpen, setDd] = React.useState(false);
+  const Arrow = ({ dir, onClick }) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      style={{ position: 'absolute', top: '50%', [dir]: 28, transform: 'translateY(-50%)',
+        border: 'none', background: 'rgba(255,255,255,.08)', color: 'rgba(255,255,255,.9)',
+        width: 44, height: 44, borderRadius: 22, fontSize: 18, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.18)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.08)')}>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d={dir === 'left' ? 'M11 3L5 9l6 6' : 'M7 3l6 6-6 6'} /></svg>
+    </button>
+  );
+
+  // Portal to body so position:fixed is the real viewport regardless of any
+  // transform on DesignCanvas's ancestors (including the canvas zoom itself).
+  return ReactDOM.createPortal(
+    <div onClick={() => ctx.setFocus(null)}
+      onWheel={(e) => e.preventDefault()}
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(24,20,16,.6)', backdropFilter: 'blur(14px)',
+        fontFamily: DC.font, color: '#fff' }}>
+
+      {/* top bar: section dropdown (left) · close (right) */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 72, display: 'flex', alignItems: 'flex-start', padding: '16px 20px 0', gap: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setDd((o) => !o)}
+            style={{ border: 'none', background: 'transparent', color: '#fff', cursor: 'pointer', padding: '6px 8px',
+              borderRadius: 6, textAlign: 'left', fontFamily: 'inherit' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18, fontWeight: 600, letterSpacing: -0.3 }}>{meta.title}</span>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ opacity: .7 }}><path d="M2 4l3.5 3.5L9 4"/></svg>
+            </span>
+            {meta.subtitle && <span style={{ display: 'block', fontSize: 13, opacity: .6, fontWeight: 400, marginTop: 2 }}>{meta.subtitle}</span>}
+          </button>
+          {ddOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: '#2a251f', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(0,0,0,.4)', padding: 4, minWidth: 200, zIndex: 10 }}>
+              {sectionOrder.map((sid) => (
+                <button key={sid} onClick={() => { setDd(false); const f = sectionMeta[sid].slotIds[0]; if (f) ctx.setFocus(`${sid}/${f}`); }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                    background: sid === sectionId ? 'rgba(255,255,255,.1)' : 'transparent', color: '#fff',
+                    padding: '8px 12px', borderRadius: 5, fontSize: 14, fontWeight: sid === sectionId ? 600 : 400, fontFamily: 'inherit' }}>
+                  {sectionMeta[sid].title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => ctx.setFocus(null)}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,.12)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,.7)', width: 32, height: 32,
+            borderRadius: 16, fontSize: 20, cursor: 'pointer', lineHeight: 1, transition: 'background .12s' }}>×</button>
+      </div>
+
+      {/* card centered, label + index below — only the card itself stops
+          propagation so any backdrop click (including the margins around
+          the card) exits focus */}
+      <div
+        style={{ position: 'absolute', top: 64, bottom: 56, left: 100, right: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: width * scale, height: height * scale, position: 'relative' }}>
+          <div style={{ width, height, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#fff', borderRadius: 2, overflow: 'hidden',
+            boxShadow: '0 20px 80px rgba(0,0,0,.4)' }}>
+            {children || <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bbb' }}>{aid}</div>}
+          </div>
+        </div>
+        <div onClick={(e) => e.stopPropagation()} style={{ fontSize: 14, fontWeight: 500, opacity: .85, textAlign: 'center' }}>
+          {(sec.labels || {})[aid] ?? artboard.props.label}
+          <span style={{ opacity: .5, marginLeft: 10, fontVariantNumeric: 'tabular-nums' }}>{idx + 1} / {peers.length}</span>
+        </div>
+      </div>
+
+      <Arrow dir="left" onClick={() => go(-1)} />
+      <Arrow dir="right" onClick={() => go(1)} />
+
+      {/* dots */}
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
+        {peers.map((p, i) => (
+          <button key={p} onClick={() => ctx.setFocus(`${sectionId}/${p}`)}
+            style={{ border: 'none', padding: 0, cursor: 'pointer', width: 6, height: 6, borderRadius: 3,
+              background: i === idx ? '#fff' : 'rgba(255,255,255,.3)' }} />
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Post-it — absolute-positioned sticky note
+// ─────────────────────────────────────────────────────────────
+function DCPostIt({ children, top, left, right, bottom, rotate = -2, width = 180 }) {
+  return (
+    <div style={{
+      position: 'absolute', top, left, right, bottom, width,
+      background: DC.postitBg, padding: '14px 16px',
+      fontFamily: '"Comic Sans MS", "Marker Felt", "Segoe Print", cursive',
+      fontSize: 14, lineHeight: 1.4, color: DC.postitText,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08)',
+      transform: `rotate(${rotate}deg)`,
+      zIndex: 5,
+    }}>{children}</div>
+  );
+}
+
+Object.assign(window, { DesignCanvas, DCSection, DCArtboard, DCPostIt });
+
+
+
+/* ===== wireframes.jsx ===== */
+// weave · UX wireframes — sketch-style exploration of 4 directions + signature flow.
+
+// ── tiny primitives ────────────────────────────────────────────────
+const Pill = ({children, tone}) => <span className={'sk-pill '+(tone||'')}>{children}</span>;
+const Btn = ({children, tone, style}) => <span className={'sk-btn '+(tone||'')} style={style}>{children}</span>;
+const Cap = ({children}) => <div className="cap">{children}</div>;
+const K = ({children}) => <span className="k">{children}</span>;
+const Mono = ({children, style}) => <span className="mono" style={style}>{children}</span>;
+const Hand = ({children, style}) => <span style={{fontFamily:'var(--hand)', ...style}}>{children}</span>;
+const Title = ({children, style}) => <span className="title" style={style}>{children}</span>;
+
+// 9x9 LED glyph approximations (P=on)
+const GLYPHS = {
+  play: ['.........','..P......','..PP.....','..PPP....','..PPPP...','..PPP....','..PP.....','..P......','.........'],
+  pause:['.........','..PP.PP..','..PP.PP..','..PP.PP..','..PP.PP..','..PP.PP..','..PP.PP..','..PP.PP..','.........'],
+  vol:  ['.........','........P','......P.P','....P.P.P','..P.P.P.P','P.P.P.P.P','P.P.P.P.P','P.P.P.P.P','P.P.P.P.P'],
+};
+const Glyph = ({name, size=20}) => {
+  const pat = GLYPHS[name] || GLYPHS.play;
+  const cell = Math.floor((size-6)/9);
+  return <div className="glyph9" style={{gridTemplateColumns:`repeat(9,${cell}px)`, gridAutoRows:`${cell}px`}}>
+    {pat.flatMap((row,y)=>row.split('').map((c,x)=><div key={y+'-'+x} className={c==='P'?'p':'o'}/>))}
+  </div>;
+};
+
+// Hand-drawn arrow SVG (for node graph)
+const Arrow = ({from, to, color='var(--line)', curve=0, label, dashed, style}) => {
+  const dx = to.x-from.x, dy = to.y-from.y;
+  const mx = (from.x+to.x)/2 + curve, my=(from.y+to.y)/2 - Math.abs(dx)*0.06;
+  const d = `M ${from.x} ${from.y} Q ${mx} ${my} ${to.x-8} ${to.y}`;
+  return <g style={style}>
+    <path d={d} stroke={color} strokeWidth="1.6" fill="none" strokeDasharray={dashed?'4 4':undefined} strokeLinecap="round"/>
+    <path d={`M ${to.x} ${to.y} l -8 -4 l 2 4 l -2 4 z`} fill={color}/>
+    {label && <text x={mx} y={my-4} textAnchor="middle" fontFamily="var(--hand)" fontSize="13" fill={color}>{label}</text>}
+  </g>;
+};
+
+// ── INTRO CARD ─────────────────────────────────────────────────────
+function Intro(){
+  return <div style={{width:1060, padding:'10px 6px'}}>
+    <div className="intro-card">
+      <div className="cap" style={{marginBottom:6}}>weave · UX re-design · wireframes v1</div>
+      <div className="title" style={{fontSize:36, lineHeight:1.1, marginBottom:10}}>マッピングを中心に据えた、4つの情報設計を探索</div>
+      <div style={{fontSize:17, lineHeight:1.5, color:'var(--ink-2)', maxWidth:900}}>
+        前提: 現状UIは <b>Edges / Zones / Lights / Mappings</b> が並列のリスト。日常のタスクの大半は
+        <b> 新しい device × service でマッピングを作る／編集する</b> のに、その導線が最も迂遠。
+        家族 (非技術者) + OSS利用者 も含めてスケールする UX を考える。
+      </div>
+      <div style={{display:'flex', gap:18, marginTop:18, flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 280px'}}>
+          <Cap>軸1 · 情報の主語</Cap>
+          <div style={{fontSize:15, marginTop:4}}>
+            現状は <b>リソース別</b>。これを <b>部屋</b> / <b>マッピング</b> / <b>ノードグラフ</b> / <b>ウィザード</b> に置き換える案を並べる。
+          </div>
+        </div>
+        <div style={{flex:'1 1 280px'}}>
+          <Cap>軸2 · 主要な作成体験</Cap>
+          <div style={{fontSize:15, marginTop:4}}>
+            device入力 <span style={{color:'var(--accent)'}}>→</span> intent <span style={{color:'var(--accent)'}}>→</span> service の <b>3ペイン ノードグラフ</b> を主案に。
+            代替として Wizard / Canvas / Zero-config を並べる。
+          </div>
+        </div>
+        <div style={{flex:'1 1 280px'}}>
+          <Cap>軸3 · ライブ性</Cap>
+          <div style={{fontSize:15, marginTop:4}}>
+            Nuimo LED をブラウザ上にリアルタイム同期し、操作が走った瞬間に該当マッピング行を光らせる (全案共通)。
+          </div>
+        </div>
+      </div>
+      <hr className="hr dash" style={{marginTop:20, marginBottom:14}}/>
+      <div style={{display:'flex', gap:10, flexWrap:'wrap', fontSize:14}}>
+        <span className="chip">A · Home view (部屋中心)</span>
+        <span className="chip">B · Mapping Graph (ノードグラフ)</span>
+        <span className="chip">C · Wizard (新規作成最短)</span>
+        <span className="chip">D · Studio (上級者の密度)</span>
+        <span className="chip" style={{background:'#fde5dc'}}>E · Mapping作成フロー · 4ステップ</span>
+      </div>
+    </div>
+  </div>;
+}
+
+// ── Shared top chrome sketch ───────────────────────────────────────
+const TopBar = ({title, active, right}) => (
+  <div style={{display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1.5px solid var(--line)', background:'#fffdf7'}}>
+    <Title style={{fontSize:22}}>weave</Title>
+    <span style={{display:'inline-block', width:6, height:6, borderRadius:3, background:'var(--live)'}}/>
+    <span className="mono" style={{fontSize:10}}>live</span>
+    {title && <div style={{marginLeft:16, fontSize:15}}>{title}</div>}
+    <div style={{marginLeft:'auto', display:'flex', gap:8, alignItems:'center'}}>
+      {right}
+      <span className="k">⌘K</span>
+    </div>
+  </div>
+);
+
+// Export to window for the other files to pick up
+Object.assign(window, { Pill, Btn, Cap, K, Mono, Hand, Title, Glyph, Arrow, Intro, TopBar, GLYPHS });
+
+
+/* ===== wf-a.jsx ===== */
+// wf-a.jsx — Direction A: "Home" view (room-centered)
+// 部屋/場所を軸に、そこにいる device + service + mapping をひとかたまりに
+
+function WireframeA(){
+  return <div style={{width:900, height:580, display:'flex', flexDirection:'column', background:'var(--paper-2)'}}>
+    <TopBar title={<span>Home <span className="dim">· Living Room</span></span>} right={<Pill tone="live">● 2 edges</Pill>}/>
+    {/* room tabs */}
+    <div style={{display:'flex', gap:8, padding:'10px 14px', borderBottom:'1.5px dashed var(--line)', background:'#fffdf7'}}>
+      <span className="sk-pill accent">Living Room</span>
+      <span className="sk-pill">Kitchen</span>
+      <span className="sk-pill">Bedroom</span>
+      <span className="sk-pill ghost">+ room</span>
+    </div>
+    <div style={{flex:1, padding:14, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14}}>
+      {/* Devices pane */}
+      <div className="sk" style={{padding:12}}>
+        <div className="cap">Devices in this room</div>
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:10}}>
+          <div style={{display:'flex', alignItems:'center', gap:10, padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7', boxShadow:'0 0 0 2px #fde5dc'}}>
+            <div className="nuimo"><Glyph name="vol" size={26}/></div>
+            <div style={{flex:1}}>
+              <div className="title" style={{fontSize:18}}>Nuimo · sofa</div>
+              <div className="mono">C3:81:…FF:6A</div>
+              <div style={{marginTop:4}}><span className="sk-pill live" style={{fontSize:11}}>rotating now</span></div>
+            </div>
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:10, padding:8, border:'1.5px dashed var(--ink-3)', borderRadius:6}}>
+            <div className="nuimo" style={{opacity:.5}}></div>
+            <div><div style={{fontSize:15}}>Nuimo · desk</div><div className="mono dim">disconnected · 2h</div></div>
+          </div>
+          <div style={{textAlign:'center', padding:'10px 0'}}><Btn>+ Pair device</Btn></div>
+        </div>
+      </div>
+      {/* Services pane */}
+      <div className="sk" style={{padding:12}}>
+        <div className="cap">Services this room controls</div>
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:10}}>
+          <div style={{padding:10, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              <Title style={{fontSize:18}}>Roon</Title>
+              <Pill>zone · Living</Pill>
+              <span style={{marginLeft:'auto'}} className="sk-pill live">▶ playing</span>
+            </div>
+            <div style={{marginTop:6, fontSize:13}} className="dim">Artist — Track title</div>
+            <div style={{marginTop:8, display:'flex', alignItems:'center', gap:6}}>
+              <div className="mono">vol</div>
+              <div style={{flex:1, height:8, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', position:'relative'}}>
+                <div style={{position:'absolute', inset:'0 45% 0 0', background:'var(--accent)', borderRadius:3}}/>
+              </div>
+              <span className="mono">55</span>
+            </div>
+          </div>
+          <div style={{padding:10, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              <Title style={{fontSize:18}}>Hue</Title>
+              <Pill>group · Living</Pill>
+              <span style={{marginLeft:'auto'}} className="sk-pill">80%</span>
+            </div>
+            <div style={{marginTop:6, fontSize:13}} className="dim">3 lights · warm</div>
+          </div>
+          <div style={{textAlign:'center', padding:'4px 0'}}><Btn>+ Add service</Btn></div>
+        </div>
+      </div>
+      {/* Mappings pane */}
+      <div className="sk" style={{padding:12}}>
+        <div className="cap">Connections <span style={{color:'var(--accent)', marginLeft:6}}>↯ flash on trigger</span></div>
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:8}}>
+          <div style={{padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fde5dc'}}>
+            <div style={{display:'flex', alignItems:'center', gap:6, fontSize:14}}>
+              <Hand>Nuimo·sofa</Hand><span style={{color:'var(--accent)'}}>→</span><Hand>Roon·Living</Hand>
+            </div>
+            <div className="mono" style={{marginTop:4}}>rotate→vol · press→play/pause · swipe→next/prev</div>
+          </div>
+          <div style={{padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:6, fontSize:14}}>
+              <Hand>Nuimo·sofa</Hand><span style={{color:'var(--accent)'}}>→</span><Hand>Hue·Living</Hand>
+            </div>
+            <div className="mono" style={{marginTop:4}}>long_press→brightness · swipe_up→switch target</div>
+          </div>
+          <div style={{padding:10, border:'1.5px dashed var(--line)', borderRadius:6, textAlign:'center'}}>
+            <Btn tone="accent">+ Connect a device to a service</Btn>
+            <div className="mono" style={{marginTop:4}}>pick 2 tiles on the left → choose preset</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style={{padding:'6px 14px', borderTop:'1.5px dashed var(--line)', display:'flex', gap:8, fontSize:12}} className="mono">
+      <span>Home-first IA · 家族にも「リビングのNuimoで何ができるか」が一覧で分かる</span>
+      <span style={{marginLeft:'auto'}}>Trade-off: 部屋をまたぐ mapping が置き場に困る</span>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeA });
+
+
+/* ===== wf-b.jsx ===== */
+// wf-b.jsx — Direction B: Mapping Graph (node-graph editor)
+// 三カラム node-graph: Devices (入力) → Routes (intent) → Services (出力)
+
+function WireframeB(){
+  // Anchor coords for arrows
+  const cols = {d: 110, r: 450, s: 790};
+  const rows = [140, 220, 300, 380];
+  return <div style={{width:960, height:600, display:'flex', flexDirection:'column', background:'var(--paper-2)', position:'relative'}}>
+    <TopBar title={<span>Mapping Graph <span className="dim">· 3 mappings · 1 live</span></span>} right={<Btn tone="accent">+ New mapping</Btn>}/>
+    <div style={{position:'absolute', top:60, left:0, right:0, bottom:40, padding:14}}>
+      <svg viewBox="0 0 920 500" width="920" height="500" style={{position:'absolute', inset:'14px', pointerEvents:'none'}}>
+        {/* connectors */}
+        <Arrow from={{x:220,y:140}} to={{x:380,y:140}} label="rotate" color="var(--accent)"/>
+        <Arrow from={{x:220,y:140}} to={{x:380,y:220}} label="press" color="var(--ink-2)" curve={20}/>
+        <Arrow from={{x:220,y:140}} to={{x:380,y:300}} label="swipe_r" color="var(--ink-2)" curve={40}/>
+        <Arrow from={{x:220,y:140}} to={{x:380,y:380}} label="long_press" color="var(--accent-2)" curve={60}/>
+        <Arrow from={{x:580,y:140}} to={{x:720,y:140}} label="volume_change" color="var(--accent)"/>
+        <Arrow from={{x:580,y:220}} to={{x:720,y:140}} label="play_pause" color="var(--ink-2)" curve={-20}/>
+        <Arrow from={{x:580,y:300}} to={{x:720,y:140}} label="next" color="var(--ink-2)" curve={-40}/>
+        <Arrow from={{x:580,y:380}} to={{x:720,y:320}} label="brightness" color="var(--accent-2)"/>
+      </svg>
+      {/* Devices column */}
+      <div style={{position:'absolute', left:14, top:14, width:210}}>
+        <Cap>Device inputs</Cap>
+        <div className="sk" style={{marginTop:6, padding:10}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <div className="nuimo" style={{width:38, height:38}}><Glyph name="vol" size={20}/></div>
+            <div>
+              <div className="title" style={{fontSize:17}}>Nuimo · sofa</div>
+              <div className="mono">living-room edge</div>
+            </div>
+          </div>
+          <hr className="hr dash"/>
+          <div style={{display:'flex', flexDirection:'column', gap:6, fontSize:13}}>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="k">rotate</span><span className="dim">↻</span></div>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="k">press</span><span className="dim">●</span></div>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="k">swipe_r</span><span className="dim">→</span></div>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="k">swipe_l</span><span className="dim">←</span></div>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="k">long_press</span><span className="dim">●●●</span></div>
+          </div>
+        </div>
+        <div style={{marginTop:8}} className="sk dash"><div style={{padding:10, textAlign:'center', fontSize:13}} className="dim">+ Add device</div></div>
+      </div>
+      {/* Routes column (middle) */}
+      <div style={{position:'absolute', left:380, top:14, width:200}}>
+        <Cap>Intents <span style={{color:'var(--accent)', marginLeft:4}}>(routes)</span></Cap>
+        <div style={{marginTop:6, display:'flex', flexDirection:'column', gap:8}}>
+          <div className="sk" style={{padding:'8px 10px', background:'#fde5dc', boxShadow:'0 0 0 2px var(--accent)', position:'relative'}}>
+            <span style={{position:'absolute', top:-8, right:-8}} className="sk-pill live">● live</span>
+            <div className="title" style={{fontSize:16}}>volume_change</div>
+            <div className="mono">damping: 80</div>
+          </div>
+          <div className="sk" style={{padding:'8px 10px'}}>
+            <div className="title" style={{fontSize:16}}>play_pause</div>
+          </div>
+          <div className="sk" style={{padding:'8px 10px'}}>
+            <div className="title" style={{fontSize:16}}>next</div>
+          </div>
+          <div className="sk" style={{padding:'8px 10px'}}>
+            <div className="title" style={{fontSize:16}}>brightness_change</div>
+            <div className="mono">damping: 60</div>
+          </div>
+          <div className="sk dash" style={{padding:'8px 10px', textAlign:'center', fontSize:13}}><span className="dim">+ intent</span></div>
+        </div>
+      </div>
+      {/* Services column */}
+      <div style={{position:'absolute', right:14, top:14, width:200}}>
+        <Cap>Services</Cap>
+        <div className="sk" style={{marginTop:6, padding:10}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <Title style={{fontSize:17}}>Roon</Title>
+            <Pill tone="live">▶</Pill>
+          </div>
+          <div className="mono">zone: Living</div>
+          <div style={{marginTop:6, display:'flex', gap:4, alignItems:'center'}}>
+            <span className="mono">vol</span>
+            <div style={{flex:1, height:6, border:'1.5px solid var(--line)', background:'#fffdf7'}}>
+              <div style={{width:'55%', height:'100%', background:'var(--accent)'}}/>
+            </div>
+          </div>
+          <div style={{marginTop:6}}><span className="sk-pill" style={{fontSize:11}}>switch zone ▾</span></div>
+        </div>
+        <div className="sk" style={{marginTop:8, padding:10}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <Title style={{fontSize:17}}>Hue</Title>
+            <Pill>80%</Pill>
+          </div>
+          <div className="mono">group: Living</div>
+        </div>
+        <div style={{marginTop:8}} className="sk dash"><div style={{padding:10, textAlign:'center', fontSize:13}} className="dim">+ Add service</div></div>
+      </div>
+      {/* selected-edge inspector (bottom) */}
+      <div style={{position:'absolute', left:14, right:14, bottom:0, padding:10, borderTop:'1.5px dashed var(--line)', background:'#fffdf7'}}>
+        <div style={{display:'flex', gap:12, alignItems:'center', fontSize:13}}>
+          <Cap>Selected edge</Cap>
+          <span className="title" style={{fontSize:15}}>rotate → volume_change</span>
+          <span className="dim">·</span><span className="mono">damping</span>
+          <span className="sk-inp" style={{minWidth:40, textAlign:'center'}}>80</span>
+          <span className="dim">·</span><span className="mono">feedback</span>
+          <Pill><Glyph name="vol" size={16}/> vol_bar</Pill>
+          <span style={{marginLeft:'auto'}} className="mono dim">click a wire to edit</span>
+        </div>
+      </div>
+    </div>
+    <div style={{padding:'6px 14px', borderTop:'1.5px dashed var(--line)', display:'flex', gap:8, fontSize:12, marginTop:'auto'}} className="mono">
+      <span>★ 主案 · ノードグラフで 入力→intent→出力 が一望できる / drag to connect で新規 mapping</span>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeB });
+
+
+/* ===== wf-c.jsx ===== */
+// wf-c.jsx — Direction C: Wizard (4-step new-mapping flow)
+// Primary pain point (新規作成) 最短化。家族でも作れる。
+
+function WireframeC(){
+  return <div style={{width:900, height:580, display:'flex', flexDirection:'column', background:'var(--paper-2)'}}>
+    <TopBar title={<span>New mapping · <span className="dim">step 2 of 4</span></span>}/>
+    {/* stepper */}
+    <div style={{padding:'12px 18px', borderBottom:'1.5px dashed var(--line)', display:'flex', gap:10, alignItems:'center', background:'#fffdf7'}}>
+      {[['Device','sofa · Nuimo'], ['Service','Roon → Living'], ['Actions',''], ['Feedback','']].map(([t,sub],i)=>(
+        <React.Fragment key={t}>
+          <div style={{display:'flex', gap:6, alignItems:'center'}}>
+            <span className={'ann num'} style={{background:i<2?'var(--live)':i===2?'var(--accent)':'var(--ink-3)', position:'static'}}>{i+1}</span>
+            <div>
+              <div className="title" style={{fontSize:15, color:i===2?'var(--accent)':'var(--ink)'}}>{t}</div>
+              {sub && <div className="mono">{sub}</div>}
+            </div>
+          </div>
+          {i<3 && <div style={{flex:'0 0 30px', borderTop:'1.5px dashed var(--ink-3)'}}/>}
+        </React.Fragment>
+      ))}
+    </div>
+    <div style={{flex:1, padding:'18px 24px', overflow:'hidden'}}>
+      <div className="title" style={{fontSize:22}}>Nuimo「sofa」で Roon「Living」をどう操作する？</div>
+      <div style={{fontSize:14, marginTop:4}} className="dim">Pick a preset, or customize each gesture.</div>
+      {/* preset chooser */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginTop:16}}>
+        {[
+          {name:'Music default', desc:'rotate=vol, press=play/pause, swipe=track', chosen:true},
+          {name:'Discovery', desc:'swipe_up=zone switch, press=shuffle'},
+          {name:'Custom', desc:'gesture ごとに自分で選ぶ'},
+        ].map(p=>(
+          <div key={p.name} className="sk" style={{padding:12, background:p.chosen?'#fde5dc':'#fffdf7', boxShadow:p.chosen?'0 0 0 2px var(--accent)':undefined}}>
+            <div className="title" style={{fontSize:18}}>{p.name}</div>
+            <div style={{fontSize:13, marginTop:4}} className="dim">{p.desc}</div>
+          </div>
+        ))}
+      </div>
+      {/* gesture grid */}
+      <div style={{marginTop:18, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+        {[
+          ['rotate', '↻', 'volume_change', 'damping 80'],
+          ['press', '●', 'play_pause', null],
+          ['swipe →', '→', 'next', null],
+          ['swipe ←', '←', 'previous', null],
+          ['long_press', '●●●', '— unused —', null, true],
+          ['swipe ↑', '↑', 'switch zone', 'zones: Living, Kitchen'],
+        ].map(([g, ic, intent, p, empty])=>(
+          <div key={g} className="sk" style={{padding:'8px 10px', display:'flex', alignItems:'center', gap:10, background:empty?'#fffdf7':'#fffdf7', borderStyle:empty?'dashed':'solid'}}>
+            <div className="nuimo" style={{width:34, height:34, fontSize:14}}><Hand>{ic}</Hand></div>
+            <div style={{flex:1}}>
+              <div className="mono">{g}</div>
+              <div className="title" style={{fontSize:15, color:empty?'var(--ink-3)':'var(--ink)'}}>{intent}</div>
+              {p && <div className="mono" style={{color:'var(--accent)'}}>{p}</div>}
+            </div>
+            <span className="sk-pill ghost" style={{fontSize:11}}>change ▾</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div style={{padding:'10px 18px', borderTop:'1.5px solid var(--line)', display:'flex', gap:8, background:'#fffdf7'}}>
+      <Btn>← Back</Btn>
+      <div style={{flex:1, alignSelf:'center'}} className="mono dim">
+        <Hand>「使ってみて」: この設定は仮で保存、Nuimo で実際に触って確かめて次へ</Hand>
+      </div>
+      <Btn>Skip feedback</Btn>
+      <Btn tone="accent">Next: Feedback →</Btn>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeC });
+
+
+/* ===== wf-d.jsx ===== */
+// wf-d.jsx — Direction D: Studio (dense, keyboard-driven, developer tool)
+
+function WireframeD(){
+  return <div style={{width:1000, height:600, display:'flex', flexDirection:'column', background:'#1a1714', color:'#f3ebdc', fontFamily:'var(--mono)'}}>
+    {/* top bar dark */}
+    <div style={{display:'flex', alignItems:'center', gap:10, padding:'6px 10px', borderBottom:'1px solid #3a332c', fontSize:12}}>
+      <span style={{fontFamily:'var(--title)', fontSize:20, color:'#f3ebdc'}}>weave</span>
+      <span>·</span><span style={{color:'#8fcf8f'}}>● live</span>
+      <span>·</span><span style={{color:'#c6a66b'}}>3 mappings</span>
+      <span>·</span><span style={{color:'#c6a66b'}}>1 edge</span>
+      <span style={{marginLeft:'auto', color:'#8a8278'}}>⌘K commands</span>
+    </div>
+    <div style={{flex:1, display:'grid', gridTemplateColumns:'220px 1fr 280px', fontSize:12}}>
+      {/* left nav tree */}
+      <div style={{borderRight:'1px solid #3a332c', padding:'10px 8px'}}>
+        <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em'}}>MAPPINGS</div>
+        {[
+          {id:'m1', l:'nuimo·sofa → roon·Living', live:true},
+          {id:'m2', l:'nuimo·sofa → hue·Living'},
+          {id:'m3', l:'nuimo·desk → roon·Desk', off:true},
+        ].map(m=>(
+          <div key={m.id} style={{padding:'4px 6px', marginTop:4, borderRadius:3, background:m.live?'#2a2824':undefined, borderLeft:m.live?'2px solid #c94a26':'2px solid transparent', opacity:m.off?0.5:1}}>
+            <div style={{color:m.live?'#f3ebdc':'#c6c0b4'}}>{m.l}</div>
+            {m.live && <div style={{color:'#8fcf8f', fontSize:10}}>↻ rotate 10ms ago</div>}
+          </div>
+        ))}
+        <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em', marginTop:14}}>EDGES</div>
+        <div style={{padding:'4px 6px', color:'#c6c0b4'}}>living-room <span style={{color:'#8fcf8f'}}>●</span></div>
+        <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em', marginTop:14}}>GLYPHS</div>
+        <div style={{padding:'4px 6px', color:'#c6c0b4'}}>132 glyphs · a–z · 0–99 …</div>
+      </div>
+      {/* main: split view — inspector / JSON */}
+      <div style={{display:'flex', flexDirection:'column', borderRight:'1px solid #3a332c'}}>
+        <div style={{padding:'8px 12px', borderBottom:'1px solid #3a332c', display:'flex', gap:10}}>
+          <span style={{color:'#c94a26'}}>● mapping</span>
+          <span>nuimo / C3:81:…FF:6A → roon / 16017ec…</span>
+          <span style={{marginLeft:'auto', color:'#8a8278'}}>edit mode: inspector / <span style={{color:'#f3ebdc'}}>json</span> / graph</span>
+        </div>
+        {/* table-style routes */}
+        <div style={{padding:'8px 12px', borderBottom:'1px solid #3a332c'}}>
+          <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em'}}>ROUTES · first-match</div>
+          <table style={{width:'100%', marginTop:6, fontSize:12, borderCollapse:'collapse'}}>
+            <thead style={{color:'#8a8278'}}><tr><td>#</td><td>input</td><td>intent</td><td>params</td><td>last fire</td></tr></thead>
+            <tbody>
+              {[['0','rotate','volume_change','damping=80','3 ms ago', true], ['1','press','play_pause','—','2s ago'], ['2','swipe_right','next','—','—'], ['3','swipe_left','previous','—','—'], ['4','long_press','—','—','—']].map((r,i)=>(
+                <tr key={i} style={{background:r[5]?'#2a2824':undefined, color:r[2]==='—'?'#6a6258':'#f3ebdc'}}>
+                  {r.slice(0,5).map((c,j)=><td key={j} style={{padding:'3px 4px', borderBottom:'1px dashed #3a332c'}}>{c}{j===4 && r[5] && <span style={{marginLeft:4, color:'#8fcf8f'}}>●</span>}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* JSON preview */}
+        <div style={{flex:1, padding:'8px 12px', color:'#c6c0b4', overflow:'hidden'}}>
+          <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em'}}>JSON PREVIEW · writes on save</div>
+          <pre style={{marginTop:6, fontSize:11, lineHeight:1.45, color:'#c6c0b4'}}>{`{
+  "edge_id": "living-room",
+  "device": "nuimo/C3:81:DF:4E:FF:6A",
+  "service": "roon/16017ec931848…",
+  "routes": [
+    { "input": "rotate", "intent": "volume_change", "damping": 80 },
+    { "input": "press",  "intent": "play_pause" }
+  ],
+  "feedback": [
+    { "state": "playback", "map": { "playing":"play", "paused":"pause" } },
+    { "state": "volume",   "glyph": "volume_bar" }
+  ]
+}`}</pre>
+        </div>
+      </div>
+      {/* right: device live view + console */}
+      <div style={{padding:'10px 12px', display:'flex', flexDirection:'column', gap:10}}>
+        <div>
+          <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em'}}>NUIMO · LIVE LED</div>
+          <div style={{marginTop:6, display:'flex', gap:10, alignItems:'center'}}>
+            <div style={{width:70, height:70, borderRadius:'50%', border:'1px solid #3a332c', display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <Glyph name="vol" size={44}/>
+            </div>
+            <div style={{fontSize:11, color:'#c6c0b4'}}>
+              <div>glyph: <span style={{color:'#f3ebdc'}}>volume_bar</span></div>
+              <div>value: <span style={{color:'#c94a26'}}>55 / 100</span></div>
+              <div>since: 3 ms ago</div>
+            </div>
+          </div>
+        </div>
+        <div style={{flex:1, borderTop:'1px solid #3a332c', paddingTop:8}}>
+          <div style={{color:'#8a8278', fontSize:10, letterSpacing:'.1em'}}>EVENT STREAM</div>
+          <div style={{fontSize:11, marginTop:6, lineHeight:1.5, color:'#c6c0b4'}}>
+            <div><span style={{color:'#c6a66b'}}>17:42:11</span> nuimo/sofa rotate Δ+3</div>
+            <div><span style={{color:'#c6a66b'}}>17:42:11</span> → roon/Living vol 52→55</div>
+            <div><span style={{color:'#c6a66b'}}>17:42:09</span> roon state playback:playing</div>
+            <div><span style={{color:'#c6a66b'}}>17:42:01</span> nuimo/sofa press</div>
+            <div><span style={{color:'#c6a66b'}}>17:42:01</span> → roon/Living play_pause</div>
+            <div><span style={{color:'#c6a66b'}}>17:41:58</span> edge:connected living-room</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style={{padding:'4px 10px', borderTop:'1px solid #3a332c', fontSize:11, color:'#8a8278', display:'flex', gap:12}}>
+      <span>j/k · navigate</span>
+      <span>e · edit</span>
+      <span>s · switch target</span>
+      <span>n · new mapping</span>
+      <span>/ · filter</span>
+      <span style={{marginLeft:'auto', color:'#c6a66b'}}>dense · OSS maintainer-grade</span>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeD });
+
+
+/* ===== wf-e.jsx ===== */
+// wf-e.jsx — Direction E: new-mapping signature flow (4-step storyboard)
+
+function FlowStep({n, title, desc, children}){
+  return <div style={{width:260, height:360, background:'var(--paper)', border:'1.5px solid var(--line)', borderRadius:8, padding:10, display:'flex', flexDirection:'column', boxShadow:'1.5px 2px 0 rgba(0,0,0,.08)'}}>
+    <div style={{display:'flex', alignItems:'center', gap:8}}>
+      <span className="ann num" style={{position:'static'}}>{n}</span>
+      <Title style={{fontSize:18}}>{title}</Title>
+    </div>
+    <div style={{fontSize:12, color:'var(--ink-2)', marginTop:4, minHeight:32}}>{desc}</div>
+    <div style={{flex:1, marginTop:6, background:'#fffdf7', border:'1.5px dashed var(--ink-3)', borderRadius:6, padding:8, position:'relative', overflow:'hidden'}}>
+      {children}
+    </div>
+  </div>;
+}
+
+function WireframeE(){
+  return <div style={{width:1200, display:'flex', flexDirection:'column', gap:10, padding:10, background:'var(--paper-2)'}}>
+    <div style={{display:'flex', alignItems:'center', gap:10}}>
+      <Cap>Signature flow</Cap>
+      <Title style={{fontSize:22}}>新規マッピング作成 · 4ステップで家族でも</Title>
+      <span className="dim" style={{marginLeft:8, fontSize:13}}>主案(B)のグラフ上で <Hand>drag-to-connect</Hand> → そのままこのシートに入る</span>
+    </div>
+    <div style={{display:'flex', gap:14, alignItems:'flex-start'}}>
+      <FlowStep n={1} title="Pick" desc="繋ぎたい device と service をタイルで選ぶ (or 自動検出された候補から)">
+        <div style={{display:'flex', gap:8, flexDirection:'column'}}>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+            <span className="sk-pill accent" style={{fontSize:11}}><div className="nuimo" style={{width:16, height:16}}/>Nuimo sofa</span>
+            <span className="sk-pill" style={{fontSize:11}}>Nuimo desk</span>
+            <span className="sk-pill ghost" style={{fontSize:11}}>+ pair</span>
+          </div>
+          <div style={{fontSize:18, textAlign:'center', color:'var(--accent)'}}>↓</div>
+          <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+            <span className="sk-pill accent" style={{fontSize:11}}>Roon · Living</span>
+            <span className="sk-pill" style={{fontSize:11}}>Roon · Kitchen</span>
+            <span className="sk-pill" style={{fontSize:11}}>Hue · Living</span>
+          </div>
+          <hr className="hr dash"/>
+          <div className="mono" style={{fontSize:10}}>自動提案: 同じ部屋にある pair を先頭に</div>
+          <div style={{marginTop:4}}><Btn tone="accent" style={{fontSize:13}}>Preview mapping →</Btn></div>
+        </div>
+      </FlowStep>
+
+      <FlowStep n={2} title="Preset or Gestures" desc="プリセットでそのまま / カスタム。各 gesture は未設定もOK">
+        <div style={{display:'flex', flexDirection:'column', gap:5}}>
+          <div style={{padding:'4px 6px', border:'1.5px solid var(--accent)', background:'#fde5dc', borderRadius:4, fontSize:11}}>▦ Music default (4 routes)</div>
+          <div style={{padding:'4px 6px', border:'1.5px solid var(--line)', borderRadius:4, fontSize:11}}>▦ Discovery (with zone switch)</div>
+          <div style={{padding:'4px 6px', border:'1.5px dashed var(--line)', borderRadius:4, fontSize:11}}>▦ Custom</div>
+          <hr className="hr dash"/>
+          <div style={{display:'flex', gap:5, alignItems:'center', fontSize:11}}><span className="k">rotate</span>→<span>volume_change</span></div>
+          <div style={{display:'flex', gap:5, alignItems:'center', fontSize:11}}><span className="k">press</span>→<span>play_pause</span></div>
+          <div style={{display:'flex', gap:5, alignItems:'center', fontSize:11}}><span className="k">swipe_r</span>→<span>next</span></div>
+          <div style={{display:'flex', gap:5, alignItems:'center', fontSize:11}} className="dim"><span className="k">long_press</span>→—</div>
+        </div>
+      </FlowStep>
+
+      <FlowStep n={3} title="Try it" desc="保存前に Nuimo を実際に触って確認。LED もブラウザに同期">
+        <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8, paddingTop:4}}>
+          <div className="nuimo" style={{width:72, height:72, boxShadow:'0 0 0 4px #fde5dc'}}><Glyph name="vol" size={36}/></div>
+          <div className="mono" style={{fontSize:10, textAlign:'center'}}>↻ rotate detected · 3ms ago<br/>vol 52 → 55 ✓</div>
+          <div style={{width:'100%', borderTop:'1.5px dashed var(--ink-3)', paddingTop:6}}>
+            <div className="mono" style={{fontSize:10}}>event stream</div>
+            <div style={{fontSize:10, color:'var(--ink-2)'}}>▸ press → play_pause ✓</div>
+            <div style={{fontSize:10, color:'var(--ink-2)'}}>▸ rotate → volume ✓</div>
+            <div style={{fontSize:10, color:'var(--accent)'}}>▸ swipe_l → previous (未確認)</div>
+          </div>
+        </div>
+      </FlowStep>
+
+      <FlowStep n={4} title="Feedback (optional)" desc="Roon の state → Nuimo LED の見え方をプリセットで">
+        <div style={{display:'flex', flexDirection:'column', gap:6}}>
+          <div style={{display:'flex', gap:6, alignItems:'center', fontSize:11}}>
+            <span className="mono">playback</span><span style={{color:'var(--accent)'}}>→</span>
+            <Glyph name="play" size={16}/> / <Glyph name="pause" size={16}/>
+          </div>
+          <div style={{display:'flex', gap:6, alignItems:'center', fontSize:11}}>
+            <span className="mono">volume</span><span style={{color:'var(--accent)'}}>→</span>
+            <Glyph name="vol" size={16}/> <span className="dim">volume_bar</span>
+          </div>
+          <hr className="hr dash"/>
+          <div className="mono" style={{fontSize:10}}>dB-style zone は自動で向き反転</div>
+          <div style={{marginTop:'auto'}}><Btn tone="accent" style={{fontSize:13, width:'100%', justifyContent:'center'}}>Save mapping ✓</Btn></div>
+          <div className="mono" style={{fontSize:9, textAlign:'center'}}>→ edge-agent に即配信</div>
+        </div>
+      </FlowStep>
+
+      {/* aftercare */}
+      <FlowStep n={5} title="After" desc="グラフに戻って live で光る。いつでも戻って調整">
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <svg width="220" height="100">
+            <rect x="5" y="30" width="60" height="40" rx="4" fill="#fffdf7" stroke="var(--line)"/>
+            <text x="35" y="55" textAnchor="middle" fontFamily="var(--hand)" fontSize="12">Nuimo</text>
+            <rect x="155" y="30" width="60" height="40" rx="4" fill="#fde5dc" stroke="var(--accent)"/>
+            <text x="185" y="55" textAnchor="middle" fontFamily="var(--hand)" fontSize="12">Roon</text>
+            <Arrow from={{x:65,y:50}} to={{x:155,y:50}} label="live" color="var(--accent)"/>
+          </svg>
+          <hr className="hr dash"/>
+          <div className="mono" style={{fontSize:10}}>今後の再編集は:</div>
+          <div style={{fontSize:11}}>· graph で wire クリック</div>
+          <div style={{fontSize:11}}>· ⌘K → "edit mapping…"</div>
+          <div style={{fontSize:11}}>· Nuimo 上で長押し → 候補切替</div>
+          <div style={{fontSize:11, color:'var(--accent)'}}>★ 再起動不要 / live push</div>
+        </div>
+      </FlowStep>
+    </div>
+    <div style={{padding:'6px 10px', fontSize:12}} className="mono">
+      <span>設計原則: (1) 家族は step 1-2 だけで完結 (2) Try it でエラーを事前に潰す (3) Feedback は skippable (4) 全ステップから &lt;Save draft&gt;</span>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeE });
+
+
+/* ===== wf-a2.jsx ===== */
+// wf-a2.jsx — Direction A (revised): room-less. 3 pane - Devices / Services / Connections
+// 部屋の概念を排し、フラットなリストを「Connections」が横串で繋ぐ
+
+function WireframeA2(){
+  return <div style={{width:960, height:600, display:'flex', flexDirection:'column', background:'var(--paper-2)'}}>
+    <TopBar
+      title={<span>Everything <span className="dim">· 3 devices · 2 services · 3 mappings</span></span>}
+      right={<>
+        <span className="sk-inp" style={{minWidth:140}}>🔍 filter…</span>
+        <Pill tone="live">● live</Pill>
+      </>}/>
+
+    <div style={{flex:1, padding:14, display:'grid', gridTemplateColumns:'260px 1fr 260px', gap:14}}>
+      {/* ── Devices (left) ── */}
+      <div className="sk" style={{padding:12, display:'flex', flexDirection:'column'}}>
+        <div style={{display:'flex', alignItems:'center'}}>
+          <div className="cap">Devices</div>
+          <span style={{marginLeft:'auto'}} className="mono">3</span>
+        </div>
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:8}}>
+          <div style={{display:'flex', gap:9, alignItems:'center', padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fde5dc', boxShadow:'0 0 0 2px var(--accent)'}}>
+            <div className="nuimo" style={{width:40, height:40}}><Glyph name="vol" size={22}/></div>
+            <div style={{flex:1, minWidth:0}}>
+              <div className="title" style={{fontSize:17}}>sofa</div>
+              <div className="mono" style={{overflow:'hidden', textOverflow:'ellipsis'}}>nuimo · C3:81:…6A</div>
+              <div style={{marginTop:3, display:'flex', gap:4}}>
+                <span className="sk-pill live" style={{fontSize:10, padding:'0 6px'}}>↻ rotating</span>
+                <span className="sk-pill" style={{fontSize:10, padding:'0 6px'}}>2 links</span>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'flex', gap:9, alignItems:'center', padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div className="nuimo" style={{width:40, height:40}}></div>
+            <div style={{flex:1, minWidth:0}}>
+              <div className="title" style={{fontSize:17}}>desk</div>
+              <div className="mono">nuimo · 4F:22:…B1</div>
+              <div style={{marginTop:3}}><span className="sk-pill" style={{fontSize:10, padding:'0 6px'}}>1 link</span></div>
+            </div>
+          </div>
+          <div style={{display:'flex', gap:9, alignItems:'center', padding:8, border:'1.5px dashed var(--ink-3)', borderRadius:6, opacity:.7}}>
+            <div className="nuimo" style={{width:40, height:40, opacity:.4}}></div>
+            <div style={{flex:1, minWidth:0}}>
+              <div style={{fontSize:15}}>bedside</div>
+              <div className="mono dim">disconnected · 2h ago</div>
+            </div>
+          </div>
+          <div style={{textAlign:'center', padding:'8px 0'}}>
+            <Btn>+ Pair device</Btn>
+          </div>
+          <hr className="hr dash"/>
+          <div className="cap">Input stream</div>
+          <div className="mono" style={{fontSize:10, lineHeight:1.6}}>
+            <div>17:42:11 <span style={{color:'var(--accent)'}}>sofa</span> rotate Δ+3</div>
+            <div>17:42:01 <span style={{color:'var(--accent)'}}>sofa</span> press</div>
+            <div>17:41:40 <span style={{color:'var(--accent-2)'}}>desk</span> swipe_r</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Connections (center, main) ── */}
+      <div className="sk" style={{padding:12, display:'flex', flexDirection:'column'}}>
+        <div style={{display:'flex', alignItems:'center', gap:10}}>
+          <div className="cap">Connections</div>
+          <span className="mono">3</span>
+          <div style={{marginLeft:'auto', display:'flex', gap:4}}>
+            <span className="sk-pill ghost" style={{fontSize:11}}>all</span>
+            <span className="sk-pill" style={{fontSize:11}}>active</span>
+            <span className="sk-pill ghost" style={{fontSize:11}}>roon</span>
+            <span className="sk-pill ghost" style={{fontSize:11}}>hue</span>
+          </div>
+        </div>
+
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:10}}>
+          {/* live/flashing row */}
+          <div style={{padding:10, border:'1.5px solid var(--accent)', borderRadius:6, background:'#fde5dc', boxShadow:'0 0 0 3px rgba(201,74,38,.15)', position:'relative'}}>
+            <span style={{position:'absolute', top:-8, right:12}} className="sk-pill live" >● firing</span>
+            <div style={{display:'flex', alignItems:'center', gap:6, fontSize:16}}>
+              <Hand style={{fontWeight:700}}>sofa</Hand>
+              <span style={{color:'var(--accent)', fontSize:20}}>→</span>
+              <Hand style={{fontWeight:700}}>Roon · Living</Hand>
+              <span style={{marginLeft:'auto'}} className="sk-pill" >▶ 55</span>
+              <span className="sk-pill ghost" style={{fontSize:11}}>switch ▾</span>
+            </div>
+            <div style={{marginTop:6, display:'flex', gap:6, flexWrap:'wrap'}}>
+              <span className="sk-pill" style={{fontSize:11, background:'#fffdf7'}}><span className="k" style={{border:'none', padding:0, background:'none'}}>rotate</span>→vol</span>
+              <span className="sk-pill" style={{fontSize:11, background:'#fffdf7'}}><span className="k" style={{border:'none', padding:0, background:'none'}}>press</span>→play/pause</span>
+              <span className="sk-pill" style={{fontSize:11, background:'#fffdf7'}}>swipe→next/prev</span>
+              <span className="sk-pill ghost" style={{fontSize:11}}>+ route</span>
+            </div>
+          </div>
+
+          <div style={{padding:10, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:6, fontSize:16}}>
+              <Hand style={{fontWeight:700}}>sofa</Hand>
+              <span style={{color:'var(--accent)', fontSize:20}}>→</span>
+              <Hand style={{fontWeight:700}}>Hue · Living group</Hand>
+              <span style={{marginLeft:'auto'}} className="sk-pill">80%</span>
+            </div>
+            <div style={{marginTop:6, display:'flex', gap:6}}>
+              <span className="sk-pill" style={{fontSize:11, background:'#fffdf7'}}>long_press→brightness</span>
+              <span className="sk-pill" style={{fontSize:11, background:'#fffdf7'}}>swipe_up→switch target</span>
+            </div>
+          </div>
+
+          <div style={{padding:10, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7', opacity:.65}}>
+            <div style={{display:'flex', alignItems:'center', gap:6, fontSize:16}}>
+              <Hand>desk</Hand>
+              <span style={{color:'var(--ink-3)', fontSize:20}}>→</span>
+              <Hand>Roon · Desk</Hand>
+              <span style={{marginLeft:'auto'}} className="sk-pill ghost">inactive</span>
+            </div>
+            <div className="mono" style={{marginTop:4}}>3 routes</div>
+          </div>
+
+          <div style={{padding:14, border:'1.5px dashed var(--line)', borderRadius:6, textAlign:'center', background:'#fffdf7'}}>
+            <Btn tone="accent">+ New connection</Btn>
+            <div className="mono" style={{marginTop:6}}>pick a device tile, then a service tile — or drag one onto the other</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Services (right) ── */}
+      <div className="sk" style={{padding:12, display:'flex', flexDirection:'column'}}>
+        <div style={{display:'flex', alignItems:'center'}}>
+          <div className="cap">Services</div>
+          <span style={{marginLeft:'auto'}} className="mono">2</span>
+        </div>
+        <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:8}}>
+          <div style={{padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:6}}>
+              <Title style={{fontSize:17}}>Roon</Title>
+              <span className="sk-pill live" style={{fontSize:10, padding:'0 6px'}}>core ok</span>
+            </div>
+            <div style={{marginTop:5, display:'flex', flexDirection:'column', gap:3, fontSize:12}}>
+              <div style={{display:'flex', alignItems:'center', gap:6, padding:'3px 6px', border:'1.5px solid var(--accent)', borderRadius:4, background:'#fde5dc'}}>
+                <span>Living</span>
+                <span className="sk-pill live" style={{fontSize:10, padding:'0 5px', marginLeft:'auto'}}>▶ 55</span>
+              </div>
+              <div style={{padding:'3px 6px', border:'1.5px solid var(--line)', borderRadius:4, display:'flex', gap:6}}>Desk <span style={{marginLeft:'auto'}} className="dim">paused</span></div>
+              <div style={{padding:'3px 6px', border:'1.5px solid var(--line)', borderRadius:4, display:'flex', gap:6}}>Kitchen <span style={{marginLeft:'auto'}} className="dim">idle</span></div>
+            </div>
+          </div>
+          <div style={{padding:8, border:'1.5px solid var(--line)', borderRadius:6, background:'#fffdf7'}}>
+            <div style={{display:'flex', alignItems:'center', gap:6}}>
+              <Title style={{fontSize:17}}>Hue</Title>
+              <span className="sk-pill live" style={{fontSize:10, padding:'0 6px'}}>bridge ok</span>
+            </div>
+            <div style={{marginTop:5, display:'flex', flexDirection:'column', gap:3, fontSize:12}}>
+              <div style={{padding:'3px 6px', border:'1.5px solid var(--accent)', borderRadius:4, background:'#fde5dc', display:'flex'}}>Living group <span style={{marginLeft:'auto'}} className="mono">80%</span></div>
+              <div style={{padding:'3px 6px', border:'1.5px solid var(--line)', borderRadius:4, display:'flex'}}>Kitchen <span style={{marginLeft:'auto'}} className="dim">off</span></div>
+              <div style={{padding:'3px 6px', border:'1.5px solid var(--line)', borderRadius:4, display:'flex'}}>Bedside <span style={{marginLeft:'auto'}} className="dim">off</span></div>
+            </div>
+          </div>
+          <div style={{textAlign:'center', padding:'4px 0'}}>
+            <Btn>+ Add service</Btn>
+          </div>
+          <hr className="hr dash"/>
+          <div className="cap">Edges</div>
+          <div style={{fontSize:12}}>
+            <div style={{display:'flex', gap:6, alignItems:'center'}}><span className="led-dot" style={{background:'var(--live)'}}/> living-room <span className="mono dim" style={{marginLeft:'auto'}}>2ms</span></div>
+            <div style={{display:'flex', gap:6, alignItems:'center', marginTop:3}}><span className="led-dot off"/> nas <span className="mono dim" style={{marginLeft:'auto'}}>—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style={{padding:'6px 14px', borderTop:'1.5px dashed var(--line)', display:'flex', gap:12, fontSize:12}} className="mono">
+      <span>Room-less · 左=入力源 / 中央=繋ぎ (主役) / 右=出力先</span>
+      <span>タグや filter で絞り込み (部屋名を tag として付けるのは任意)</span>
+      <span style={{marginLeft:'auto'}}>tile ↔ tile ドラッグで新規 connection</span>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeA2 });
+
+
+/* ===== wf-a2-flow.jsx ===== */
+// wf-a2-flow.jsx — A2 を起点とした UX flow (storyboard)
+// Device 選択 → Connection 作成 → Routes → Feedback → Live
+
+function FlowCard({n, title, desc, children, accent}){
+  return <div style={{width:280, height:420, background:'var(--paper)', border:'1.5px solid var(--line)', borderRadius:8, padding:10, display:'flex', flexDirection:'column', boxShadow:'1.5px 2px 0 rgba(0,0,0,.08)', position:'relative'}}>
+    <div style={{display:'flex', alignItems:'center', gap:8}}>
+      <span className="ann num" style={{position:'static', background:accent||'var(--accent)'}}>{n}</span>
+      <Title style={{fontSize:18}}>{title}</Title>
+    </div>
+    <div style={{fontSize:12, color:'var(--ink-2)', marginTop:4, minHeight:30, lineHeight:1.4}}>{desc}</div>
+    <div style={{flex:1, marginTop:6, background:'#fffdf7', border:'1.5px dashed var(--ink-3)', borderRadius:6, padding:8, position:'relative', overflow:'hidden'}}>
+      {children}
+    </div>
+  </div>;
+}
+
+// Mini A2 tile helpers — with live state visible (like A)
+const DevTile = ({name, batt, conns, state, hl, pulse, glyph, disconn}) => (
+  <div style={{display:'flex', gap:6, alignItems:'stretch', padding:5, border:'1.5px solid '+(hl?'var(--accent)':'var(--line)'), borderRadius:4, background:hl?'#fde5dc':'#fffdf7', boxShadow:hl?'0 0 0 2px var(--accent)':undefined, fontSize:10, opacity:disconn?0.55:1, position:'relative'}}>
+    {pulse && <span className="sk-pill live" style={{position:'absolute', top:-5, right:4, fontSize:8, padding:'0 4px'}}>● live</span>}
+    <div className="nuimo" style={{width:28, height:28, flexShrink:0, position:'relative'}}>
+      {glyph && <Glyph name={glyph} size={14}/>}
+      {pulse && !glyph && <div style={{width:5,height:5,background:'var(--accent)',borderRadius:'50%'}}/>}
+    </div>
+    <div style={{minWidth:0, flex:1, lineHeight:1.3}}>
+      <Hand style={{fontWeight:700, fontSize:11}}>{name}</Hand>
+      <div className="mono" style={{fontSize:8, color:'var(--ink-3)'}}>
+        {disconn ? <span style={{color:'#b85'}}>◌ disconnected</span> : <>▮{batt} · {conns}↔</>}
+      </div>
+      {state && <div className="mono" style={{fontSize:8, color:'var(--accent)'}}>{state}</div>}
+    </div>
+  </div>
+);
+const SvcTile = ({name, state, hl, nested}) => (
+  <div style={{padding:nested?'3px 5px':5, border:'1.5px solid '+(hl?'var(--accent)':'var(--line)'), borderRadius:nested?3:4, background:hl?'#fde5dc':'#fffdf7', fontSize:nested?10:11, display:'flex', alignItems:'center', gap:5}}>
+    <Hand style={{fontWeight:nested?500:700, flex:1}}>{name}</Hand>
+    {state && <span className="mono" style={{fontSize:8, color:'var(--ink-3)'}}>{state}</span>}
+  </div>
+);
+
+function WireframeA2Flow(){
+  return <div style={{width:1560, display:'flex', flexDirection:'column', gap:10, padding:10, background:'var(--paper-2)'}}>
+    <div style={{display:'flex', alignItems:'center', gap:10}}>
+      <Cap>A2 · UX flow</Cap>
+      <Title style={{fontSize:22}}>Device → Connection → Routes → Feedback → Live</Title>
+      <span className="dim" style={{marginLeft:8, fontSize:13}}>A2の3ペインを軸に。各ステップは A2 画面の状態遷移として自然に繋がる</span>
+    </div>
+    <div style={{display:'flex', gap:12, alignItems:'flex-start', flexWrap:'wrap'}}>
+
+      {/* 1. DEVICE focus */}
+      <FlowCard n={1} title="Device を選ぶ" desc="左ペインの Device タイルをクリック。右側が「このデバイスで何ができるか」に切り替わる">
+        <div style={{display:'flex', flexDirection:'column', gap:5}}>
+          <div className="cap" style={{fontSize:9}}>Devices · 3</div>
+          <DevTile name="sofa" batt="82%" conns="2" state="↻ rotating · 55%" hl pulse glyph="vol"/>
+          <DevTile name="desk" batt="64%" conns="3" state="idle · 2m ago" glyph="play"/>
+          <DevTile name="bedside" batt="—" conns="1" disconn/>
+          <hr className="hr dash"/>
+          <div className="cap" style={{fontSize:9}}>Connections for <Hand>sofa</Hand></div>
+          <div style={{padding:5, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:11}}>
+            <Hand>sofa</Hand> → Roon · Living
+          </div>
+          <div style={{padding:5, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:11}}>
+            <Hand>sofa</Hand> → Hue · Living
+          </div>
+          <div style={{padding:6, border:'1.5px dashed var(--accent)', borderRadius:4, textAlign:'center', fontSize:11, background:'#fde5dc', marginTop:2}}>
+            <Btn tone="accent" style={{fontSize:11}}>+ New connection from sofa</Btn>
+          </div>
+          <div className="mono" style={{fontSize:9, marginTop:4}}>💡 detected: Roon "Kitchen" zone is unlinked</div>
+        </div>
+      </FlowCard>
+
+      {/* 2. CONNECTION = pick a service */}
+      <FlowCard n={2} title="Service を選ぶ" desc="右ペインの Service tile にドラッグ or クリック。繋がりが即「draft」として中央に現れる">
+        <div style={{display:'flex', gap:6, height:'100%'}}>
+          <div style={{flex:1, display:'flex', flexDirection:'column', gap:4}}>
+            <div className="cap" style={{fontSize:9}}>Services · 2</div>
+            <SvcTile name="Roon" state="▶ playing"/>
+            <div style={{paddingLeft:8, display:'flex', flexDirection:'column', gap:3}}>
+              <SvcTile nested name="Living ✓" state="Jazz · 55%"/>
+              <SvcTile nested hl name="Kitchen ←" state="idle · unlinked"/>
+              <SvcTile nested name="Desk" state="unlinked"/>
+            </div>
+            <SvcTile name="Hue" state="3 lights on"/>
+            <div style={{paddingLeft:8, fontSize:9, color:'var(--ink-3)', lineHeight:1.5, fontFamily:'ui-monospace,monospace'}}>Living ✓ 72% · Kitchen ◌ off · Bedside ◌ off</div>
+          </div>
+        </div>
+        <div style={{position:'absolute', left:8, right:8, bottom:8, padding:6, border:'1.5px dashed var(--accent)', borderRadius:4, background:'#fffdf7', fontSize:10}}>
+          <div style={{color:'var(--accent)'}}><Hand>sofa</Hand> → <Hand>Roon · Kitchen</Hand></div>
+          <div className="mono" style={{fontSize:9, color:'var(--ink-3)'}}>draft · default preset applied</div>
+        </div>
+      </FlowCard>
+
+      {/* 3. ROUTES inline */}
+      <FlowCard n={3} title="Routes を調整" desc="中央の新 connection カードがインライン展開。プリセットで即決もOK、gesture単位でも変えられる">
+        <div style={{display:'flex', flexDirection:'column', gap:4}}>
+          <div style={{padding:6, border:'1.5px solid var(--accent)', borderRadius:4, background:'#fde5dc'}}>
+            <div style={{fontSize:12}}><Hand style={{fontWeight:700}}>sofa → Roon · Kitchen</Hand></div>
+            <div style={{display:'flex', gap:4, marginTop:4, flexWrap:'wrap'}}>
+              <span className="sk-pill" style={{fontSize:9, padding:'0 5px', background:'#fffdf7'}}>Music default</span>
+              <span className="sk-pill ghost" style={{fontSize:9, padding:'0 5px'}}>Discovery</span>
+              <span className="sk-pill ghost" style={{fontSize:9, padding:'0 5px'}}>Custom</span>
+            </div>
+          </div>
+          {[['rotate','↻','volume_change','damping 80'],
+            ['press','●','play_pause',null],
+            ['swipe_r','→','next',null],
+            ['swipe_l','←','previous',null],
+            ['long_press','●●●','— unused —',null]].map(([g,ic,i,p,empty])=>(
+            <div key={g} style={{display:'flex', alignItems:'center', gap:5, padding:4, border:'1.5px solid var(--line)', borderStyle:i.startsWith('—')?'dashed':'solid', borderRadius:4, background:'#fffdf7', fontSize:10}}>
+              <span className="k" style={{minWidth:50}}>{g}</span>
+              <span style={{color:'var(--accent)'}}>→</span>
+              <span style={{flex:1, color:i.startsWith('—')?'var(--ink-3)':'var(--ink)'}}>{i}</span>
+              {p && <span className="mono" style={{fontSize:8, color:'var(--accent)'}}>{p}</span>}
+              <span className="sk-pill ghost" style={{fontSize:8, padding:'0 4px'}}>▾</span>
+            </div>
+          ))}
+          <div className="mono" style={{fontSize:9, marginTop:2, color:'var(--ink-3)'}}>先勝ち順。↑↓で並び替え可</div>
+        </div>
+      </FlowCard>
+
+      {/* 4. TRY IT live */}
+      <FlowCard n={4} title="Try it — 実機で確認" desc="保存前に Nuimo を触って動作確認。左ペインの input stream と LED ミラーが即反応" accent="var(--accent-2)">
+        <div style={{display:'flex', flexDirection:'column', gap:5, alignItems:'center'}}>
+          <div className="cap" style={{fontSize:9, alignSelf:'flex-start'}}>Nuimo live mirror</div>
+          <div className="nuimo" style={{width:56, height:56, boxShadow:'0 0 0 4px #fde5dc', marginTop:2}}><Glyph name="vol" size={30}/></div>
+          <div className="mono" style={{fontSize:9, textAlign:'center'}}>LED: volume_bar · 55/100</div>
+          <hr className="hr dash" style={{width:'100%'}}/>
+          <div style={{alignSelf:'flex-start', fontSize:10, lineHeight:1.6}}>
+            <div><span className="mono" style={{color:'var(--live)'}}>✓</span> rotate → volume +3 (Kitchen 52→55)</div>
+            <div><span className="mono" style={{color:'var(--live)'}}>✓</span> press → play_pause</div>
+            <div><span className="mono" style={{color:'var(--accent)'}}>?</span> swipe_l — まだ触ってない</div>
+            <div><span className="mono" style={{color:'var(--ink-3)'}}>—</span> long_press (未設定)</div>
+          </div>
+          <div className="mono" style={{fontSize:9, color:'var(--ink-3)', alignSelf:'flex-start'}}>触った入力が順にチェックされていく</div>
+        </div>
+      </FlowCard>
+
+      {/* 5. FEEDBACK */}
+      <FlowCard n={5} title="Feedback (任意)" desc="Service 側 state → Nuimo LED の表現。Skip可。プリセット推奨、細かい編集は展開で">
+        <div style={{display:'flex', flexDirection:'column', gap:5}}>
+          <div style={{padding:5, border:'1.5px solid var(--accent)', borderRadius:4, background:'#fde5dc', fontSize:11, textAlign:'center'}}>
+            ▦ Music feedback preset (recommended)
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:5, padding:4, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:10}}>
+            <span className="mono" style={{minWidth:60}}>playback</span>
+            <span style={{color:'var(--accent)'}}>→</span>
+            <Glyph name="play" size={14}/>/<Glyph name="pause" size={14}/>
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:5, padding:4, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:10}}>
+            <span className="mono" style={{minWidth:60}}>volume</span>
+            <span style={{color:'var(--accent)'}}>→</span>
+            <Glyph name="vol" size={14}/>
+            <span className="mono" style={{fontSize:9}}>volume_bar</span>
+          </div>
+          <hr className="hr dash"/>
+          <div className="mono" style={{fontSize:9}}>dB zone は自動で向き反転 / 0dB が「上 inv」に</div>
+          <div style={{marginTop:'auto', display:'flex', gap:6}}>
+            <Btn style={{fontSize:11}}>Skip</Btn>
+            <Btn tone="accent" style={{fontSize:11, flex:1, justifyContent:'center'}}>Save connection ✓</Btn>
+          </div>
+          <div className="mono" style={{fontSize:9, textAlign:'center', color:'var(--accent)'}}>→ edge-agent に即配信 (再起動なし)</div>
+        </div>
+      </FlowCard>
+
+      {/* 6. LIVE / aftercare */}
+      <FlowCard n={6} title="Live に戻る" desc="A2画面に戻ると、新 connection が active として並ぶ。発火時は行全体が光る" accent="var(--live)">
+        <div style={{display:'flex', flexDirection:'column', gap:5}}>
+          <div style={{padding:6, border:'1.5px solid var(--accent)', borderRadius:4, background:'#fde5dc', position:'relative', fontSize:11}}>
+            <span style={{position:'absolute', top:-6, right:6}} className="sk-pill live" >● firing</span>
+            <Hand style={{fontWeight:700}}>sofa → Roon · Kitchen</Hand>
+            <div className="mono" style={{fontSize:9}}>just now · vol +3</div>
+          </div>
+          <div style={{padding:5, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:11, display:'flex', alignItems:'center', gap:6}}>
+            <Hand style={{flex:1}}>sofa → Roon · Living</Hand>
+            <span className="mono" style={{fontSize:8, color:'var(--ink-3)'}}>▶ 55%</span>
+          </div>
+          <div style={{padding:5, border:'1.5px solid var(--line)', borderRadius:4, background:'#fffdf7', fontSize:11, display:'flex', alignItems:'center', gap:6}}>
+            <Hand style={{flex:1}}>sofa → Hue · Living</Hand>
+            <span className="mono" style={{fontSize:8, color:'var(--ink-3)'}}>◉ 72%</span>
+          </div>
+          <hr className="hr dash"/>
+          <div className="cap" style={{fontSize:9}}>再編集 entry points</div>
+          <div style={{fontSize:10, lineHeight:1.6}}>
+            <div>· 行クリック → インライン展開</div>
+            <div>· ⌘K → "edit sofa → Kitchen"</div>
+            <div>· Nuimo swipe_up (switch-mode が設定済みなら) で実機からターゲット切替</div>
+          </div>
+          <div className="mono" style={{fontSize:9, color:'var(--accent)'}}>★ 家族が触りやすい entry は「Nuimo を触る」こと自体</div>
+        </div>
+      </FlowCard>
+    </div>
+
+    <div style={{padding:'8px 14px', fontSize:12, lineHeight:1.6}} className="mono">
+      <div><b>設計原則</b>:</div>
+      <div>① Device を起点にするので「どの Nuimo でできるか」が常に明示的。家族が覚えやすい</div>
+      <div>② Connection 作成は「device タイル + service タイル」の組み合わせで済む — 3クリック以内で新規</div>
+      <div>③ Routes/Feedback は <b>preset で即決</b>、こだわる人だけ展開。hidden complexity を守る</div>
+      <div>④ Try it を保存前に挟むことで「思ってたのと違う」を事前に潰す (現UIにない体験)</div>
+      <div>⑤ 全ての live 状態 (LED / input stream / service state) が全 step で visible → frustrate せず学習できる</div>
+    </div>
+  </div>;
+}
+Object.assign(window, { WireframeA2Flow });
+
+
+/* ===== main.jsx ===== */
+// main.jsx — assemble wireframes into DesignCanvas layout
+
+function App(){
+  return <DesignCanvas>
+    <DCSection id="intro" title="weave · UX re-design" subtitle="4 directions + signature flow · sketch wireframes">
+      <DCArtboard id="intro" label="Intro · 設計方針" width={1100} height={440}>
+        <Intro/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="directions" title="4 方向性" subtitle="情報設計の軸を変えて並べる">
+      <DCArtboard id="a" label="A · Home view (部屋中心)" width={900} height={580}>
+        <WireframeA/>
+      </DCArtboard>
+      <DCArtboard id="a2" label="A2 · Room-less ★ 改訂" width={960} height={600}>
+        <WireframeA2/>
+      </DCArtboard>
+      <DCArtboard id="b" label="B · Mapping Graph ★主案" width={960} height={600}>
+        <WireframeB/>
+      </DCArtboard>
+      <DCArtboard id="c" label="C · Wizard (新規最短)" width={900} height={580}>
+        <WireframeC/>
+      </DCArtboard>
+      <DCArtboard id="d" label="D · Studio (dense/OSS)" width={1000} height={600}>
+        <WireframeD/>
+      </DCArtboard>
+    </DCSection>
+
+    <DCSection id="a2flow" title="A2 起点 · UX flow" subtitle="Device → Connection → Routes → Try it → Feedback → Live">
+      <DCArtboard id="a2flow" label="A2 flow · 6 steps" width={1580} height={480}>
+        <WireframeA2Flow/>
+      </DCArtboard>
+    </DCSection>
+    <DCSection id="flow" title="E · 新規マッピング作成フロー" subtitle="主案 B のグラフから drag-to-connect で入る 5 ステップ">
+      <DCArtboard id="e" label="Signature flow" width={1240} height={420}>
+        <WireframeE/>
+      </DCArtboard>
+    </DCSection>
+  </DesignCanvas>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+
+</script>
+</body>
+</html>

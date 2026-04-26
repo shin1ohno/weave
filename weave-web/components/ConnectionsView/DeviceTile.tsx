@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { Battery, DEVICE_ICON, Link2, WifiOff } from "@/components/icon";
 import { Badge } from "@/components/ui/badge";
+import { LiveDot } from "@/components/ui/live-dot";
 import type { DeviceSummary } from "@/lib/devices";
 import type { LastInput } from "@/lib/ws";
 import { NuimoViz } from "./NuimoViz";
@@ -62,9 +63,11 @@ export function DeviceTile({
   onClick,
 }: Props) {
   const battery = device.battery;
-  // `firing` is driven by useFiringTicker which rotates lastInputByDevice
-  // entries in and out — use it rather than reading Date.now() at render.
-  const showLastInput = firing && lastInput != null;
+  // `lastInput` lingers in the store after the firing fade-out, so the
+  // tile keeps showing the most recent gesture as a tail trace. The
+  // orange ping above is what signals "right now" — the footer line is
+  // the historical record.
+  const showLastInput = lastInput != null;
   return (
     <button
       type="button"
@@ -85,12 +88,7 @@ export function DeviceTile({
             <div className="truncate text-base font-semibold text-zinc-950 dark:text-white">
               {device.nickname}
             </div>
-            {firing && (
-              <span
-                className="h-2 w-2 animate-pulse rounded-full bg-orange-500"
-                aria-label="firing"
-              />
-            )}
+            {firing && <LiveDot color="orange" firing aria-label="firing" />}
           </div>
           <div className="mt-0.5 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
             {device.device_type} · {device.device_id.slice(-8)}
@@ -113,8 +111,15 @@ export function DeviceTile({
             </Badge>
           </div>
           {showLastInput && lastInput && (
-            <div className="mt-2 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-500">
-              now · {lastInput.input}
+            <div
+              className={clsx(
+                "mt-2 truncate font-mono text-[11px]",
+                firing
+                  ? "text-orange-600 dark:text-orange-400"
+                  : "text-zinc-500 dark:text-zinc-500"
+              )}
+            >
+              {firing ? "now" : "last"} · {lastInput.input}
               {lastInput.value !== undefined &&
               lastInput.value !== null &&
               typeof lastInput.value !== "object"

@@ -2,6 +2,7 @@
 
 import { EdgeInfo } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { LiveDot } from "@/components/ui/live-dot";
 import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
@@ -35,10 +36,9 @@ export function EdgeRow({ edge, deviceCount }: Props) {
           : "border-zinc-950/5 dark:border-white/10"
       }`}
     >
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${
-          edge.online ? "bg-green-500" : "bg-zinc-400"
-        }`}
+      <LiveDot
+        color={edge.online ? "green" : "zinc"}
+        firing={edge.online}
         aria-label={edge.online ? "online" : "offline"}
       />
       <span className="font-medium text-zinc-950 dark:text-white">

@@ -2,18 +2,30 @@
 
 import clsx from "clsx";
 import { useMemo, useState } from "react";
-import type { Mapping } from "@/lib/api";
+import { deleteMapping, type Mapping } from "@/lib/api";
 import type { DeviceSummary } from "@/lib/devices";
 import type { ServiceTarget } from "@/lib/services";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { LiveDot } from "@/components/ui/live-dot";
 import { Separator } from "@/components/ui/separator";
 import {
   Pencil,
   Play,
+  Plus,
   Lightbulb,
   Volume2,
   ChevronDown,
+  Trash2,
+  INPUT_ICON,
 } from "@/components/icon";
 import { RoutesEditor } from "@/components/RoutesEditor";
 import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
@@ -64,6 +76,9 @@ export function ConnectionCard({
   lastEvent,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const variant = firing
     ? "firing"
     : mapping.active
@@ -79,15 +94,30 @@ export function ConnectionCard({
     [mapping.feedback]
   );
 
+  const SwitchOnIcon = mapping.target_switch_on
+    ? INPUT_ICON[mapping.target_switch_on]
+    : null;
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteMapping(mapping.mapping_id);
+      // The MappingChanged broadcast removes this card from the list, so
+      // the local dialog state never gets a chance to close — that's fine
+      // since the component will unmount.
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+    }
+  }
+
   return (
     <Card variant={variant} className="group">
       {firing && (
         <div className="absolute -top-2.5 right-3">
           <Badge color="orange">
-            <span
-              className="h-2 w-2 animate-pulse rounded-full bg-orange-500"
-              aria-hidden
-            />
+            <LiveDot color="orange" firing />
             firing · just now
           </Badge>
         </div>
@@ -174,22 +204,47 @@ export function ConnectionCard({
               <Pencil className="h-3.5 w-3.5" />
             )}
           </button>
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            aria-label="Delete connection"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="mt-3 flex w-full flex-wrap items-center gap-1.5 text-left"
-        aria-label={expanded ? "Collapse routes editor" : "Expand routes editor"}
+      <div
+        className="mt-3 flex w-full flex-wrap items-center gap-1.5"
+        role="group"
+        aria-label="Routes"
       >
-        {mapping.routes.map((r, i) => (
-          <RoutePill key={i} route={r} />
-        ))}
-        {mapping.routes.length === 0 && (
-          <span className="text-xs italic text-zinc-400">no routes yet</span>
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex flex-1 flex-wrap items-center gap-1.5 text-left"
+          aria-label={
+            expanded ? "Collapse routes editor" : "Expand routes editor"
+          }
+        >
+          {mapping.routes.map((r, i) => (
+            <RoutePill key={i} route={r} />
+          ))}
+          {mapping.routes.length === 0 && (
+            <span className="text-xs italic text-zinc-400">no routes yet</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label="Add a route"
+          className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-950/15 bg-transparent px-2 py-1 text-[11px] font-medium text-blue-600 transition hover:border-blue-500/60 hover:bg-blue-50 dark:border-white/15 dark:text-blue-400 dark:hover:bg-blue-500/10"
+        >
+          <Plus className="h-3 w-3" />
+          route
+        </button>
+      </div>
 
       {(feedbackStates || mapping.target_switch_on || !mapping.active || lastEvent) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-500 dark:border-white/5">
@@ -199,8 +254,11 @@ export function ConnectionCard({
             </span>
           )}
           {mapping.target_switch_on && (
-            <span>
+            <span className="inline-flex items-center gap-1">
               Switch on{" "}
+              {SwitchOnIcon && (
+                <SwitchOnIcon className="h-3 w-3 text-zinc-400" />
+              )}
               <span className="font-mono">{mapping.target_switch_on}</span>{" "}
               ({mapping.target_candidates.length} options)
             </span>
@@ -225,6 +283,36 @@ export function ConnectionCard({
           </div>
         </div>
       )}
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => (deleting ? null : setDeleteOpen(false))}
+        size="sm"
+      >
+        <DialogTitle>Delete this connection?</DialogTitle>
+        <DialogDescription>
+          {deviceName} → {targetName} will be removed. This cannot be undone.
+        </DialogDescription>
+        {deleteError && (
+          <DialogBody>
+            <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+              {deleteError}
+            </div>
+          </DialogBody>
+        )}
+        <DialogActions>
+          <Button
+            plain
+            onClick={() => setDeleteOpen(false)}
+            disabled={deleting}
+          >
+            Cancel
+          </Button>
+          <Button color="red" onClick={confirmDelete} disabled={deleting}>
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }

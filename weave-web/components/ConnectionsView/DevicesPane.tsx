@@ -15,6 +15,7 @@ import {
   deviceForMapping,
   summarizeDevices,
 } from "@/lib/devices";
+import { InputStreamPanel } from "@/components/TryItPanel/InputStreamPanel";
 import { DeviceTile } from "./DeviceTile";
 
 export function DevicesPane() {
@@ -86,6 +87,15 @@ export function DevicesPane() {
           })
         )}
       </div>
+      {devices.length > 0 && (
+        <div className="rounded-xl border border-zinc-950/5 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900">
+          <InputStreamPanel
+            variant="compact"
+            maxRows={3}
+            title="Recent input"
+          />
+        </div>
+      )}
     </aside>
   );
 }

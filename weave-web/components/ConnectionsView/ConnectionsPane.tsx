@@ -106,6 +106,9 @@ export function ConnectionsPane() {
           New connection
           {selectedDevice ? ` from ${selectedDevice.nickname}` : ""}
         </Link>
+        <p className="text-center font-mono text-[11px] text-zinc-400 dark:text-zinc-500">
+          or drag a Device tile onto a Service target
+        </p>
         {selectedDevice && filtered.length === 0 && (
           <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
             No connections for {selectedDevice.nickname} yet.

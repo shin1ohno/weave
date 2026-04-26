@@ -5,6 +5,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { LiveDot } from "@/components/ui/live-dot";
 import { Search, Sun, Moon, Zap } from "@/components/icon";
 import { useUIState, useFiringMappingIds } from "@/lib/ws";
 import { useCommandUI } from "@/hooks/useCommandUI";
@@ -56,22 +57,12 @@ export function TopBar() {
       <div className="ml-auto flex items-center gap-3">
         {firingCount > 0 && (
           <Badge color="orange">
-            <span
-              className="h-2 w-2 animate-pulse rounded-full bg-orange-500"
-              aria-hidden
-            />
+            <LiveDot color="orange" firing />
             {firingCount} firing
           </Badge>
         )}
         <Badge color={connected ? "green" : "zinc"}>
-          <span
-            className={
-              connected
-                ? "h-2 w-2 rounded-full bg-green-500"
-                : "h-2 w-2 rounded-full bg-zinc-400"
-            }
-            aria-hidden
-          />
+          <LiveDot color={connected ? "green" : "zinc"} firing={connected} />
           {connected ? "live" : "offline"}
         </Badge>
         <Link
@@ -80,6 +71,10 @@ export function TopBar() {
         >
           Stream
         </Link>
+        <span
+          className="h-6 w-px bg-zinc-950/10 dark:bg-white/10"
+          aria-hidden
+        />
         <Button plain onClick={toggle} aria-label="Toggle theme">
           {theme === "dark" ? (
             <Sun className="h-4 w-4" />
@@ -87,6 +82,13 @@ export function TopBar() {
             <Moon className="h-4 w-4" />
           )}
         </Button>
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-700 dark:bg-white/10 dark:text-zinc-200"
+          aria-label="Account placeholder"
+          title="Account"
+        >
+          S
+        </div>
       </div>
     </header>
   );
