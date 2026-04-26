@@ -55,6 +55,15 @@ function readNumber(v: unknown): number | null {
   return null;
 }
 
+function readBoolean(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (v && typeof v === "object" && "value" in v) {
+    const inner = (v as { value: unknown }).value;
+    return typeof inner === "boolean" ? inner : null;
+  }
+  return null;
+}
+
 /** Aggregate DeviceStateEntry rows into one DeviceSummary per device. Falls
  * back to extracting devices from the mappings list so that a mapping whose
  * edge is offline still renders a tile.
@@ -90,8 +99,15 @@ export function summarizeDevices(
 
   for (const d of deviceStates) {
     const dev = ensure(d);
-    dev.connected = true;
     if (!dev.lastSeen || d.updated_at > dev.lastSeen) dev.lastSeen = d.updated_at;
+
+    // Any state entry other than the explicit "connected" property implies
+    // the device was reachable when emitting it — used as a fallback for
+    // edges that don't publish their own connection state (e.g., Hue
+    // bridge devices). The explicit "connected" property below overrides.
+    if (d.property !== "connected") {
+      dev.connected = true;
+    }
 
     if (d.property === "nickname") {
       const s = readString(d.value);
@@ -102,6 +118,17 @@ export function summarizeDevices(
     } else if (d.property === "led" || d.property === "led_pattern") {
       const s = readString(d.value);
       if (s) dev.led = s;
+    }
+  }
+
+  // Pass 2: explicit "connected" property is authoritative. iOS BleBridge
+  // publishes this on `centralManager(_:didConnect:)` /
+  // `didDisconnectPeripheral` so the tile reflects real BLE state.
+  for (const d of deviceStates) {
+    if (d.property === "connected") {
+      const dev = ensure(d);
+      const b = readBoolean(d.value);
+      if (b != null) dev.connected = b;
     }
   }
 

@@ -187,39 +187,48 @@ export function DeviceTile({
               {device.connectionsCount}
             </Badge>
           </div>
-          {/* Device-control row. `stopPropagation` keeps clicks on
-           * these buttons from bubbling up to the wrapper (which would
-           * toggle device selection). The wrapper is now a div with
-           * `role="button"`, but click bubbling still reaches it. */}
-          <div
-            className="mt-2 flex flex-wrap items-center gap-1.5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Button
-              plain
-              disabled={device.connected || pending}
-              onClick={onConnect}
-              className="!px-2 !py-0.5 !text-[11px]"
+          {/* Device-control row. Gated on `device_type === "nuimo"`
+           * because only Nuimo peripherals support BLE pair / unpair /
+           * LED display via the edge-agent. Hue Tap Dial and similar
+           * non-BLE-pair devices have nothing meaningful behind these
+           * buttons — `DeviceControlBridge.swift` already short-circuits
+           * non-nuimo types — so hide the row entirely.
+           *
+           * `stopPropagation` keeps clicks on these buttons from
+           * bubbling up to the wrapper (which would toggle device
+           * selection). The wrapper is a div with `role="button"`, but
+           * click bubbling still reaches it. */}
+          {device.device_type === "nuimo" && (
+            <div
+              className="mt-2 flex flex-wrap items-center gap-1.5"
+              onClick={(e) => e.stopPropagation()}
             >
-              Connect
-            </Button>
-            <Button
-              plain
-              disabled={!device.connected || pending}
-              onClick={onDisconnect}
-              className="!px-2 !py-0.5 !text-[11px]"
-            >
-              Disconnect
-            </Button>
-            <Button
-              plain
-              disabled={!device.connected || pending}
-              onClick={onTestGlyph}
-              className="!px-2 !py-0.5 !text-[11px]"
-            >
-              Test LED · A
-            </Button>
-          </div>
+              <Button
+                plain
+                disabled={device.connected || pending}
+                onClick={onConnect}
+                className="!px-2 !py-0.5 !text-[11px]"
+              >
+                Connect
+              </Button>
+              <Button
+                plain
+                disabled={!device.connected || pending}
+                onClick={onDisconnect}
+                className="!px-2 !py-0.5 !text-[11px]"
+              >
+                Disconnect
+              </Button>
+              <Button
+                plain
+                disabled={!device.connected || pending}
+                onClick={onTestGlyph}
+                className="!px-2 !py-0.5 !text-[11px]"
+              >
+                Test LED · A
+              </Button>
+            </div>
+          )}
           {error && (
             <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-400">
               {error}
