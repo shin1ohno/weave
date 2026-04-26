@@ -6,8 +6,8 @@ import { useSuggestValues } from "@/hooks/useSuggestValues";
 import { GlyphPicker } from "./GlyphPicker";
 import type { FeedbackRule, Glyph } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Subheading } from "@/components/ui/heading";
 import { Text, Code } from "@/components/ui/text";
 
@@ -178,9 +178,13 @@ function FeedbackRuleRow({
           type
         </label>
         <div className="w-28">
-          <Select value={rule.feedback_type} disabled>
-            <option value="glyph">glyph</option>
-          </Select>
+          <Combobox
+            aria-label="Feedback type"
+            value={rule.feedback_type}
+            onChange={(v) => onChange({ ...rule, feedback_type: v })}
+            options={[{ value: "glyph", label: "glyph" }]}
+            disabled
+          />
         </div>
         <Button
           type="button"

@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useUIState } from "@/lib/ws";
 import { useKnownTargets } from "@/hooks/useKnownTargets";
 import { GlyphPicker } from "./GlyphPicker";
 import type { Glyph, Route, TargetCandidate } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Subheading } from "@/components/ui/heading";
 import { Text, Code } from "@/components/ui/text";
+import { INPUT_ICON, Lightbulb, Play, SERVICE_ICON, Volume2 } from "@/components/icon";
 import { INPUT_TYPES, INTENT_TYPES } from "./RoutesEditor/vocab";
 
 // Inputs allowed as the selection-mode trigger. These are the snake-case
@@ -32,6 +32,25 @@ const SWITCH_INPUTS = [
 // intentionally to avoid pulling non-Type imports across the component
 // boundary; update both when adding a service.
 const SERVICE_TYPES = ["roon", "hue"];
+
+const SWITCH_INPUT_OPTIONS: ComboboxOption[] = SWITCH_INPUTS.map((t) => ({
+  value: t,
+  label: t,
+  icon: INPUT_ICON[t],
+}));
+
+const INPUT_OPTIONS: ComboboxOption[] = INPUT_TYPES.map((t) => ({
+  value: t,
+  label: t,
+  icon: INPUT_ICON[t],
+}));
+
+function serviceIconFor(type: string) {
+  return (
+    SERVICE_ICON[type] ??
+    (type === "roon" ? Play : type === "hue" ? Lightbulb : Volume2)
+  );
+}
 
 interface Props {
   candidates: TargetCandidate[];
@@ -89,19 +108,15 @@ export function TargetCandidatesSection({
             switch on
           </label>
           <div className="min-w-36">
-            <Select
+            <Combobox
+              aria-label="Switch trigger input"
               value={switchOn ?? ""}
-              onChange={(e) =>
-                onSwitchOnChange(e.target.value === "" ? null : e.target.value)
-              }
-            >
-              <option value="">— disabled —</option>
-              {SWITCH_INPUTS.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
+              onChange={(v) => onSwitchOnChange(v === "" ? null : v)}
+              options={[
+                { value: "", label: "— disabled —" },
+                ...SWITCH_INPUT_OPTIONS,
+              ]}
+            />
           </div>
           <Button type="button" plain onClick={add}>
             + Add candidate
@@ -172,14 +187,11 @@ function CandidateRow({
   const isOverridden = candidate.service_type !== undefined;
   const knownTargets = useKnownTargets(effectiveServiceType);
 
-  // Match the Target section's UX: Select of known targets is the default,
-  // with an opt-in "use raw value" escape hatch. Preference is per-row so
-  // mixing pick-from-list and raw candidates within one mapping is fine.
-  const isKnown = knownTargets.some((t) => t.target === candidate.target);
-  const [userPrefersRaw, setUserPrefersRaw] = useState<boolean | null>(null);
-  const mustUseRaw =
-    knownTargets.length === 0 || (candidate.target !== "" && !isKnown);
-  const useRaw = userPrefersRaw ?? mustUseRaw;
+  const targetOptions: ComboboxOption[] = knownTargets.map((t) => ({
+    value: t.target,
+    label: t.label,
+    description: t.target !== t.label ? t.target : undefined,
+  }));
 
   const setTarget = (target: string) => {
     const inferred =
@@ -225,62 +237,49 @@ function CandidateRow({
           #{index + 1}
         </span>
         <div className="min-w-32">
-          <Select
-            value={candidate.service_type ?? ""}
-            onChange={(e) => setServiceTypeOverride(e.target.value)}
+          <Combobox
             aria-label="Service type override"
-          >
-            <option value="">inherit ({mappingServiceType})</option>
-            {SERVICE_TYPES.filter((s) => s !== mappingServiceType).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-            {/* Allow setting the override to the same value as the mapping's
-                default for explicit intent — not common, but harmless. */}
-            <option value={mappingServiceType}>{mappingServiceType}</option>
-          </Select>
+            value={candidate.service_type ?? ""}
+            onChange={(v) => setServiceTypeOverride(v)}
+            options={[
+              { value: "", label: `inherit (${mappingServiceType})` },
+              ...SERVICE_TYPES.filter((s) => s !== mappingServiceType).map(
+                (s): ComboboxOption => ({
+                  value: s,
+                  label: s,
+                  icon: serviceIconFor(s),
+                })
+              ),
+              {
+                value: mappingServiceType,
+                label: mappingServiceType,
+                icon: serviceIconFor(mappingServiceType),
+                description: "explicit",
+              },
+            ]}
+          />
         </div>
         <div className="min-w-40 flex-1">
-          {!useRaw && knownTargets.length > 0 ? (
-            <Select
-              value={candidate.target}
-              onChange={(e) => setTarget(e.target.value)}
-            >
-              <option value="">— pick —</option>
-              {knownTargets.map((t) => (
-                <option key={t.target} value={t.target}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
-          ) : (
-            <Input
-              value={candidate.target}
-              onChange={(e) => setTarget(e.target.value)}
-              placeholder="service_target"
-              className="font-mono"
-            />
-          )}
-          <div className="mt-1 text-xs">
-            {knownTargets.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setUserPrefersRaw(!useRaw)}
-                className="text-blue-600 hover:underline dark:text-blue-400"
-              >
-                {useRaw ? "← pick from list" : "use raw value"}
-              </button>
-            ) : (
-              <span className="text-zinc-500 dark:text-zinc-400">
-                No live targets for <Code>{effectiveServiceType}</Code> — enter a raw value.
-              </span>
-            )}
-          </div>
+          <Combobox
+            aria-label="Service target"
+            value={candidate.target}
+            onChange={(v) => setTarget(v)}
+            options={targetOptions}
+            allowCustom
+            placeholder="— pick —"
+            emptyState={
+              knownTargets.length === 0 ? (
+                <>
+                  No live targets for{" "}
+                  <Code>{effectiveServiceType}</Code> — type a raw value
+                </>
+              ) : undefined
+            }
+          />
         </div>
-        {/* Label input only shows in raw mode — otherwise the Select's
-            option text already shows the live display name. */}
-        {useRaw && (
+        {/* Label override — only meaningful when the target value isn't in
+            the live list (otherwise the option's label is the display name). */}
+        {!targetOptions.some((o) => o.value === candidate.target) && (
           <div className="min-w-32">
             <Input
               value={candidate.label}
@@ -374,37 +373,37 @@ function CandidateRoutesEditor({
         const isRotate = r.input === "rotate";
         const damping =
           typeof r.params?.damping === "number" ? r.params.damping : 1;
+        const intentOptions: ComboboxOption[] = INTENT_TYPES.map((t) => ({
+          value: t,
+          label: t,
+        }));
+        if (!INTENT_TYPES.includes(r.intent)) {
+          intentOptions.push({ value: r.intent, label: r.intent });
+        }
         return (
           <div key={i} className="flex flex-wrap items-center gap-2">
             <div className="min-w-36">
-              <Select
-                value={r.input}
-                onChange={(e) => update(i, { ...r, input: e.target.value })}
+              <Combobox
                 aria-label="Input"
-              >
-                {INPUT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
+                value={r.input}
+                onChange={(v) => update(i, { ...r, input: v })}
+                options={INPUT_OPTIONS}
+                allowCustom
+                size="sm"
+                mono
+              />
             </div>
             <span className="text-zinc-400">→</span>
             <div className="min-w-40">
-              <Select
-                value={r.intent}
-                onChange={(e) => update(i, { ...r, intent: e.target.value })}
+              <Combobox
                 aria-label="Intent"
-              >
-                {INTENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-                {!INTENT_TYPES.includes(r.intent) && (
-                  <option value={r.intent}>{r.intent}</option>
-                )}
-              </Select>
+                value={r.intent}
+                onChange={(v) => update(i, { ...r, intent: v })}
+                options={intentOptions}
+                allowCustom
+                size="sm"
+                mono
+              />
             </div>
             <div className="w-20">
               <Input

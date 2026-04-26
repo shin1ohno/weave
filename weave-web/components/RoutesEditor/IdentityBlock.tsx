@@ -3,11 +3,18 @@
 import { useMemo } from "react";
 import type { Mapping } from "@/lib/api";
 import { useUIState } from "@/lib/ws";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { DEVICE_ICON } from "@/components/icon";
 import { Field, Label } from "@/components/ui/fieldset";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 
 const DEVICE_TYPES = ["nuimo", "hue_tap_dial"];
+
+const DEVICE_TYPE_OPTIONS: ComboboxOption[] = DEVICE_TYPES.map((t) => ({
+  value: t,
+  label: t,
+  icon: DEVICE_ICON[t],
+}));
 
 interface Props {
   mapping: Mapping;
@@ -52,16 +59,12 @@ export function IdentityBlock({ mapping, onUpdate, mode }: Props) {
       <Field>
         <Label>Device Type</Label>
         {mode === "new" ? (
-          <Select
+          <Combobox
+            aria-label="Device Type"
             value={mapping.device_type}
-            onChange={(e) => onUpdate("device_type", e.target.value)}
-          >
-            {DEVICE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </Select>
+            onChange={(v) => onUpdate("device_type", v)}
+            options={DEVICE_TYPE_OPTIONS}
+          />
         ) : (
           <Input
             value={mapping.device_type}
