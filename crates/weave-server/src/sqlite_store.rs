@@ -9,7 +9,9 @@ use sqlx::ConnectOptions;
 use std::str::FromStr;
 
 use weave_contracts::Glyph;
-use weave_engine::{Mapping, MappingStore, StoreError};
+use weave_engine::mapping::FeedbackRule;
+use weave_engine::route::Route;
+use weave_engine::{Mapping, MappingStore, StoreError, Template, TemplateStore};
 
 pub struct SqliteStore {
     pool: SqlitePool,
@@ -184,6 +186,108 @@ impl MappingStore for SqliteStore {
     }
 }
 
+/// Tuple shape returned by every `SELECT … FROM templates` query.
+type TemplateRow = (
+    String,
+    String,
+    String,
+    String,
+    i64,
+    String,
+    String,
+    String,
+    String,
+);
+
+fn row_to_template(row: TemplateRow) -> Result<Template, StoreError> {
+    let (id, label, description, icon, builtin, domain, routes_json, feedback_json, created_at) =
+        row;
+    let routes: Vec<Route> = serde_json::from_str(&routes_json)
+        .map_err(|e| StoreError::Internal(format!("template routes json: {e}")))?;
+    let feedback: Vec<FeedbackRule> = serde_json::from_str(&feedback_json)
+        .map_err(|e| StoreError::Internal(format!("template feedback json: {e}")))?;
+    Ok(Template {
+        id,
+        label,
+        description,
+        icon,
+        builtin: builtin != 0,
+        domain,
+        routes,
+        feedback,
+        created_at,
+    })
+}
+
+#[async_trait::async_trait]
+impl TemplateStore for SqliteStore {
+    async fn list_templates(&self) -> Result<Vec<Template>, StoreError> {
+        let rows: Vec<TemplateRow> = sqlx::query_as(
+            "SELECT id, label, description, icon, builtin, domain, routes_json, feedback_json, created_at \
+             FROM templates ORDER BY builtin DESC, label",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        rows.into_iter().map(row_to_template).collect()
+    }
+
+    async fn get_template(&self, id: &str) -> Result<Option<Template>, StoreError> {
+        let row: Option<TemplateRow> = sqlx::query_as(
+            "SELECT id, label, description, icon, builtin, domain, routes_json, feedback_json, created_at \
+             FROM templates WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        row.map(row_to_template).transpose()
+    }
+
+    async fn upsert_template(&self, t: &Template) -> Result<(), StoreError> {
+        let routes_json = serde_json::to_string(&t.routes)
+            .map_err(|e| StoreError::Internal(format!("template routes json: {e}")))?;
+        let feedback_json = serde_json::to_string(&t.feedback)
+            .map_err(|e| StoreError::Internal(format!("template feedback json: {e}")))?;
+        sqlx::query(
+            "INSERT INTO templates (id, label, description, icon, builtin, domain, routes_json, feedback_json, created_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(id) DO UPDATE SET \
+                label = excluded.label, \
+                description = excluded.description, \
+                icon = excluded.icon, \
+                builtin = excluded.builtin, \
+                domain = excluded.domain, \
+                routes_json = excluded.routes_json, \
+                feedback_json = excluded.feedback_json, \
+                created_at = excluded.created_at",
+        )
+        .bind(&t.id)
+        .bind(&t.label)
+        .bind(&t.description)
+        .bind(&t.icon)
+        .bind(i64::from(t.builtin))
+        .bind(&t.domain)
+        .bind(routes_json)
+        .bind(feedback_json)
+        .bind(&t.created_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn delete_template(&self, id: &str) -> Result<bool, StoreError> {
+        let rows = sqlx::query("DELETE FROM templates WHERE id = ?")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?
+            .rows_affected();
+        Ok(rows > 0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,5 +355,53 @@ mod tests {
         let living = store.list_by_edge("living-room").await.unwrap();
         assert_eq!(living.len(), 1);
         assert_eq!(living[0].edge_id, "living-room");
+    }
+
+    fn sample_template(id: &str, builtin: bool) -> Template {
+        Template {
+            id: id.into(),
+            label: "Test".into(),
+            description: "test template".into(),
+            icon: "play".into(),
+            builtin,
+            domain: "playback".into(),
+            routes: vec![Route {
+                input: InputType::Press,
+                intent: IntentType::PlayPause,
+                params: RouteParams::default(),
+            }],
+            feedback: vec![],
+            created_at: "2026-04-26T00:00:00Z".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn template_crud_roundtrip() {
+        let store = fresh_store().await;
+        let t = sample_template("playback", true);
+        store.upsert_template(&t).await.unwrap();
+
+        let listed = store.list_templates().await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, "playback");
+        assert_eq!(listed[0].routes.len(), 1);
+
+        let got = store.get_template("playback").await.unwrap().unwrap();
+        assert_eq!(got, t);
+
+        assert!(store.delete_template("playback").await.unwrap());
+        assert!(store.get_template("playback").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn template_upsert_is_idempotent() {
+        let store = fresh_store().await;
+        let t = sample_template("playback", true);
+        store.upsert_template(&t).await.unwrap();
+        store.upsert_template(&t).await.unwrap();
+        store.upsert_template(&t).await.unwrap();
+
+        let listed = store.list_templates().await.unwrap();
+        assert_eq!(listed.len(), 1);
     }
 }

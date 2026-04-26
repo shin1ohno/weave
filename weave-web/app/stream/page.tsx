@@ -1,4 +1,4 @@
-import { InputStreamPanel } from "@/components/TryItPanel/InputStreamPanel";
+import { InputStreamPanel } from "@/components/InputStreamPanel";
 
 // Full-page fallback for direct navigation to /stream (bookmarks, external
 // links). On the main Connections view the `@drawer/(.)stream` intercept

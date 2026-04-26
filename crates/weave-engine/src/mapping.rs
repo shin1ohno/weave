@@ -52,7 +52,7 @@ pub struct TargetCandidate {
 }
 
 /// A rule for sending feedback from service state to device display.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FeedbackRule {
     /// Service state property to watch (e.g., "playback", "volume").
     pub state: String,

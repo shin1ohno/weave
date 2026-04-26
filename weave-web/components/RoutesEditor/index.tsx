@@ -6,11 +6,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { Badge } from "@/components/ui/badge";
+import clsx from "clsx";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Heading } from "@/components/ui/heading";
-import { Text } from "@/components/ui/text";
 import {
   Dialog,
   DialogActions,
@@ -18,26 +15,41 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  ChevronRight,
-  Lightbulb,
-  Play,
-  SERVICE_ICON,
-  Volume2,
-  Zap,
-} from "@/components/icon";
+import { Text } from "@/components/ui/text";
+import { INPUT_ICON, Plus, Settings, X } from "@/components/icon";
 import { useMappingDraft, type DraftMode } from "@/hooks/useMappingDraft";
-import { useTryIt } from "@/hooks/useTryIt";
-import { createMapping, type Mapping } from "@/lib/api";
+import {
+  createMapping,
+  type FeedbackRule,
+  type Mapping,
+  type TargetCandidate,
+} from "@/lib/api";
 import { summarizeDevices } from "@/lib/devices";
-import { useUIState } from "@/lib/ws";
-import { NuimoViz } from "@/components/ConnectionsView/NuimoViz";
-import { FeedbackRail } from "./FeedbackRail";
+import { summarizeServices } from "@/lib/services";
+import {
+  useFiringMappingIds,
+  useLastInputByDevice,
+  useTemplates,
+  useDispatchTemplates,
+  useUIState,
+} from "@/lib/ws";
+import {
+  deleteTemplate as apiDeleteTemplate,
+  listTemplates,
+  type Template,
+} from "@/lib/templates";
+import { GESTURE_LABEL, feedbackTemplatesFor } from "./vocab";
+import { Chip } from "./Chip";
+import { ConnHeader } from "./ConnHeader";
+import { FeedbackTemplatePicker } from "./FeedbackTemplatePicker";
+import { GesturePicker } from "./GesturePicker";
 import { IdentityBlock } from "./IdentityBlock";
-import { PresetChips } from "./PresetChips";
-import { RoutesList } from "./RoutesList";
+import { RuleSentence } from "./RuleSentence";
+import { SaveAsTemplateDialog } from "./SaveAsTemplateDialog";
 import { TargetBlock } from "./TargetBlock";
-import { TargetSwitchingBox } from "./TargetSwitchingBox";
+import { TargetPicker } from "./TargetPicker";
+import { TemplateCard } from "./TemplateCard";
+import { TryFooter } from "./TryFooter";
 
 export type RoutesEditorVariant = "full" | "drawer" | "inline";
 
@@ -47,19 +59,29 @@ interface Props {
   onCancel?: () => void;
   title?: string;
   variant?: RoutesEditorVariant;
-  /** Optional field defaults for mode=new (pre-selected device / target). */
   newDefaults?: Partial<Mapping>;
 }
 
-/** Routes editor. Layout depends on variant:
- *   - full + inline: 2-column (max-w-[880px], `1fr 260px`) with Save/Cancel
- *     in a header strip and a right rail carrying the device mirror + Try
- *     it now + Feedback rules.
- *   - drawer: single column with sticky footer (slide-in width is too
- *     narrow for the 2-column layout to read).
+/** D2 "conversation builder" Routes editor.
  *
- * Shared `useMappingDraft` plumbing — conflict detection, optimistic
- * local updates, and delete semantics are unchanged. */
+ *  Single-column layout for all variants — the outer container is
+ *  `max-w-[860px]` and the parent drawer / page / card handles its own
+ *  positioning. Sections from top to bottom:
+ *
+ *    1. ConnHeader    — device → target visual + dirty + Cancel/Save
+ *    2. Templates row — Built-in 4 + Yours N + "Save as template" card
+ *    3. Rules         — RuleSentence per route (+ duplicate detection)
+ *    4. Advanced      — Target switching sentence + Feedback templates
+ *    5. TryFooter     — live firing trace + ⌘ Enter / esc kbd hints
+ *
+ *  Data plumbing reuses `useMappingDraft` (conflict / save / delete),
+ *  `useFiringMappingIds` (live `hot` highlight), `useLastInputByDevice`
+ *  (live value badge), and the new `useTemplates` (templates list +
+ *  setter for create/delete). New-mapping mode also surfaces TargetBlock
+ *  for picking service + target before the rest of the form makes sense.
+ *  Identity (edge_id / device_type / device_id) lives in a default-closed
+ *  collapsible because the d2 design hides it; advanced users still need
+ *  the escape hatch. */
 export function RoutesEditor({
   mode,
   onSaved,
@@ -72,12 +94,12 @@ export function RoutesEditor({
   const {
     mapping,
     loadError,
+    dirty,
     updateField,
     replaceRoutes,
     addRoute,
     updateRoute,
     removeRoute,
-    moveRoute,
     saving,
     saveError,
     conflict,
@@ -90,16 +112,27 @@ export function RoutesEditor({
     handleDelete,
   } = draft;
 
+  const isEdit = mode.kind === "edit";
+  const isDrawer = variant === "drawer";
+
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
-  const isEdit = mode.kind === "edit";
-  const isInline = variant === "inline";
-  const isFull = variant === "full";
-  const isDrawer = variant === "drawer";
-  const useTwoColumn = isFull || isInline;
-  const tryIt = useTryIt();
-  const { deviceStates, mappings } = useUIState();
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+  const [openTplMenu, setOpenTplMenu] = useState<string | null>(null);
+  const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
+  const [showSwitchGesturePicker, setShowSwitchGesturePicker] = useState(false);
+  const [showTargetPicker, setShowTargetPicker] = useState(false);
+  const [showFeedbackPicker, setShowFeedbackPicker] = useState(false);
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
+    null,
+  );
+
+  const templates = useTemplates();
+  const setTemplates = useDispatchTemplates();
+  const firingMappingIds = useFiringMappingIds();
+  const lastInputByDevice = useLastInputByDevice();
+  const { deviceStates, mappings, serviceStates } = useUIState();
 
   if (loadError && !mapping)
     return <Text className="text-red-600">{loadError}</Text>;
@@ -108,16 +141,108 @@ export function RoutesEditor({
   const devices = summarizeDevices(deviceStates, mappings);
   const device =
     devices.find(
-      (d) => d.device_id === mapping.device_id && d.edge_id === mapping.edge_id
+      (d) =>
+        d.device_id === mapping.device_id && d.edge_id === mapping.edge_id,
     ) ?? null;
 
-  const ServiceIcon =
-    SERVICE_ICON[mapping.service_type] ??
-    (mapping.service_type === "roon"
-      ? Play
-      : mapping.service_type === "hue"
-        ? Lightbulb
-        : Volume2);
+  const services = summarizeServices(serviceStates, mappings);
+  const target =
+    services
+      .find((s) => s.type === mapping.service_type)
+      ?.targets.find((t) => t.target === mapping.service_target) ?? null;
+  const targetLabel = target?.label ?? mapping.service_target ?? "—";
+
+  // Live firing — the dispatcher only fires for known mappings, so we
+  // gate per-mapping. The chip-level `hot` is the gesture name; the
+  // value badge wants a string ("+5") only when the value is scalar.
+  const isFiringNow = isEdit && firingMappingIds.has(mapping.mapping_id);
+  const lastInput = lastInputByDevice[mapping.device_id] ?? null;
+  const hot = isFiringNow && lastInput ? lastInput.input : null;
+  const lastValue =
+    hot && lastInput && lastInput.value !== undefined && lastInput.value !== null && typeof lastInput.value !== "object"
+      ? String(lastInput.value)
+      : null;
+
+  // Stable per-route ids for picker keying. We synthesize from index when
+  // the server payload doesn't already carry them (it doesn't — Route is
+  // positional). That's stable enough since add/remove/move all reset
+  // the ids together.
+  const ruleRows = mapping.routes.map((route, idx) => ({
+    ...route,
+    id: `r${idx}`,
+  }));
+
+  const dupeIds = (() => {
+    const counts: Record<string, number> = {};
+    for (const r of mapping.routes) counts[r.input] = (counts[r.input] ?? 0) + 1;
+    return new Set(
+      ruleRows.filter((r) => (counts[r.input] ?? 0) > 1).map((r) => r.id),
+    );
+  })();
+
+  const builtinTemplates = templates.filter((t) => t.builtin);
+  const userTemplates = templates.filter((t) => !t.builtin);
+
+  // Apply a template: replace routes + feedback. The active template id
+  // is local UI state — it visually marks the chosen card but doesn't
+  // persist (matching d2's transient highlight).
+  const applyTemplate = (t: Template) => {
+    replaceRoutes(t.routes);
+    updateField("feedback", t.feedback);
+    setAppliedTemplateId(t.id);
+  };
+
+  const switchEnabled = (mapping.target_switch_on ?? null) !== null;
+  const switchGesture = mapping.target_switch_on ?? "swipe_up";
+  const cycleTargets = mapping.target_candidates.map((c) => c.target);
+
+  const setSwitchEnabled = (enabled: boolean) => {
+    updateField("target_switch_on", enabled ? switchGesture : null);
+    if (!enabled) updateField("target_candidates", []);
+  };
+  const setSwitchGesture = (g: string) =>
+    updateField("target_switch_on", g);
+  const toggleCycleTarget = (tid: string) => {
+    const present = cycleTargets.includes(tid);
+    if (present) {
+      const next = mapping.target_candidates.filter((c) => c.target !== tid);
+      updateField("target_candidates", next);
+      return;
+    }
+    const liveLabel =
+      services
+        .find((s) => s.type === mapping.service_type)
+        ?.targets.find((tt) => tt.target === tid)?.label ?? "";
+    const next: TargetCandidate[] = [
+      ...mapping.target_candidates,
+      { target: tid, label: liveLabel, glyph: "" },
+    ];
+    updateField("target_candidates", next);
+  };
+
+  const usedFeedbackIds = new Set(
+    mapping.feedback.map((f) => f.feedback_type),
+  );
+  const removeFeedback = (feedbackType: string) => {
+    updateField(
+      "feedback",
+      mapping.feedback.filter((f) => f.feedback_type !== feedbackType),
+    );
+  };
+  const addFeedbackFromTemplate = (tpl: {
+    state: string;
+    feedback_type: string;
+  }) => {
+    const next: FeedbackRule[] = [
+      ...mapping.feedback,
+      {
+        state: tpl.state,
+        feedback_type: tpl.feedback_type,
+        mapping: {},
+      },
+    ];
+    updateField("feedback", next);
+  };
 
   const confirmDelete = async () => {
     await handleDelete();
@@ -129,9 +254,8 @@ export function RoutesEditor({
     setDuplicating(true);
     setDuplicateError(null);
     try {
-      // Strip the mapping_id; let the server mint a new one.
-      const { mapping_id: _, ...rest } = mapping;
-      void _;
+      const { mapping_id: _ignored, ...rest } = mapping;
+      void _ignored;
       await createMapping(rest);
     } catch (err) {
       setDuplicateError(err instanceof Error ? err.message : String(err));
@@ -140,321 +264,382 @@ export function RoutesEditor({
     }
   };
 
-  const headerActions = (
-    <div className="flex items-center gap-2">
-      {isEdit && (
-        <Button
-          plain
-          onClick={handleDuplicate}
-          disabled={duplicating}
-          title="Create a copy of this connection"
-        >
-          {duplicating ? "Duplicating…" : "Duplicate"}
-        </Button>
-      )}
-      {onCancel && (
-        <Button outline type="button" onClick={onCancel}>
-          Cancel
-        </Button>
-      )}
-      <Button
-        color="blue"
-        onClick={handleSave}
-        disabled={saving || conflict !== null}
-      >
-        {saving ? "Saving…" : isEdit ? "Save" : "Create connection"}
-      </Button>
-    </div>
+  const handleTemplateDelete = async (t: Template) => {
+    await apiDeleteTemplate(t.id);
+    const refreshed = await listTemplates();
+    setTemplates(refreshed);
+    setOpenTplMenu(null);
+  };
+
+  // Outer container — same shape for all variants. Drawer parent already
+  // owns slide animation + max-width; using `mx-auto max-w-[860px]` here
+  // is a no-op for narrower parents and centers the editor on full-page.
+  const containerClass = clsx(
+    "mx-auto w-full max-w-[860px] overflow-hidden rounded-2xl border bg-white shadow-xl shadow-zinc-900/5 dark:bg-zinc-900 dark:shadow-black/40",
+    "border-zinc-950/5 dark:border-white/10",
+    isDrawer && "shadow-none",
   );
 
-  const summary = (
-    <div className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-zinc-950 dark:text-white">
-      <span className="truncate">{device?.nickname ?? mapping.device_id}</span>
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-      <ServiceIcon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
-      <span className="truncate">{mapping.service_target || "—"}</span>
-      <Badge color={mapping.active ? "green" : "zinc"}>
-        {mapping.active ? "active" : "inactive"}
-      </Badge>
-    </div>
-  );
+  // For new-mapping mode we still need the user to pick a service/target
+  // before the sentences make sense. Show a TargetBlock at the top above
+  // ConnHeader's device→target visual (which would otherwise render with
+  // a placeholder).
+  const showTargetBlock = mode.kind === "new";
 
-  const errorBanner = (
-    <>
-      {saveError && (
-        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
-          {saveError}
-        </div>
-      )}
-      {duplicateError && (
-        <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
-          Duplicate failed: {duplicateError}
-        </div>
-      )}
-      {conflict && (
-        <div className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200">
-          <div className="font-medium">
-            Server updated this connection since you started.
-          </div>
-          <div className="mt-1 text-xs">
-            Reload to discard your edits and adopt the server state, or save
-            anyway to overwrite.
-          </div>
-          <div className="mt-2 flex gap-2">
-            <Button plain onClick={handleReloadFromLive}>
-              Reload
-            </Button>
-            <Button color="red" onClick={persistSave} disabled={saving}>
-              {saving ? "Saving…" : "Save anyway"}
-            </Button>
-            <Button plain onClick={dismissConflict}>
-              Dismiss
-            </Button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
-  const showTargetBlock = mode.kind === "new" || isFull;
-
-  const leftColumn = (
-    <div className="flex flex-col gap-4">
-      {showTargetBlock && (
-        <Section title="Target">
-          <TargetBlock
-            mapping={mapping}
-            onUpdate={updateField}
-            mode={mode.kind}
-            layout={variant}
-          />
-        </Section>
-      )}
-
-      <Section
-        title="Preset"
-        action={
-          <span className="font-mono text-[11px] text-zinc-400">
-            start with a template, or skip
-          </span>
-        }
-        compact
-      >
-        <PresetChips onApply={replaceRoutes} currentRoutes={mapping.routes} />
-      </Section>
-
-      <Section
-        title={`Routes (${mapping.routes.length})`}
-        action={
-          <span className="font-mono text-[11px] text-zinc-400">
-            ↑↓ reorder · first match wins
-          </span>
-        }
-        compact
-      >
-        <RoutesList
-          routes={mapping.routes}
-          onUpdate={updateRoute}
-          onRemove={removeRoute}
-          onMove={moveRoute}
-          onAdd={(input) =>
-            addRoute(input ? { input, intent: "play" } : undefined)
-          }
-        />
-      </Section>
-
-      <InlineTargetSwitchingSection mapping={mapping} onUpdate={updateField} />
-
-      <CollapsibleSection
-        id="identity"
-        variant={variant}
-        mode={mode.kind}
-        heading="Identity (advanced)"
-        summary={identitySummary(mapping)}
-        defaultOpen={false}
-      >
-        <IdentityBlock
-          mapping={mapping}
-          onUpdate={updateField}
-          mode={mode.kind}
-        />
-      </CollapsibleSection>
-    </div>
-  );
-
-  const rightRail = (
-    <aside className="flex flex-col gap-4">
-      <section className="rounded-lg border border-zinc-950/5 bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/5">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Device preview
-        </h3>
-        <div className="flex flex-col items-center gap-2 py-2">
-          <NuimoViz pattern={device?.led ?? "blank"} size={96} firing={false} />
-          <div className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
-            {device?.nickname ?? mapping.device_id} · live mirror
-          </div>
-        </div>
-        {isEdit && (
-          <Button
-            color="orange"
-              type="button"
-            onClick={() => tryIt.openFor(mapping)}
-            className="w-full"
-          >
-            <Zap className="h-3 w-3" />
-            Try it now
-          </Button>
-        )}
-      </section>
-      <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Feedback
-        </h3>
-        <FeedbackRail mapping={mapping} onUpdate={updateField} />
-      </section>
-    </aside>
-  );
-
-  if (useTwoColumn) {
-    return (
-      <div className="mx-auto w-full max-w-[880px] rounded-2xl border border-zinc-950/5 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900">
-        {/* Header strip */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-zinc-950/5 px-5 py-3 dark:border-white/10">
-          {isFull ? (
-            <Heading className="mr-auto">
-              {title ?? (isEdit ? "Edit connection" : "New connection")}
-            </Heading>
-          ) : (
-            <div className="mr-auto min-w-0 flex-1">{summary}</div>
-          )}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-zinc-500 dark:text-zinc-400">
-              active
-            </label>
-            <Switch
-              checked={mapping.active}
-              onChange={(checked) => updateField("active", checked)}
-              aria-label="Active"
-            />
-          </div>
-          {headerActions}
-          {isEdit && (
-            <Button
-              plain
-                  onClick={() => setDeleteOpen(true)}
-              className="!text-red-600"
-            >
-              Delete
-            </Button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[1fr_260px]">
-          <div className="flex flex-col gap-4">
-            {errorBanner}
-            {leftColumn}
-          </div>
-          {rightRail}
-        </div>
-
-        {renderDeleteDialog()}
-      </div>
-    );
-  }
-
-  // drawer variant — keep the existing single-column shape with sticky footer.
   return (
-    <div className="flex flex-col">
-      <div className={isDrawer ? "space-y-5 pb-28" : "space-y-5"}>
-        <div className="flex flex-wrap items-center gap-3">
-          {title && (
-            <h3 className="mr-auto text-base font-semibold text-zinc-950 dark:text-white">
-              {title}
-            </h3>
+    <div className={containerClass}>
+      <ConnHeader
+        device={device}
+        targetLabel={targetLabel}
+        serviceType={mapping.service_type}
+        dirty={dirty}
+        saving={saving || conflict !== null}
+        onSave={handleSave}
+        onCancel={onCancel ?? (() => undefined)}
+      />
+
+      {(saveError || duplicateError || conflict) && (
+        <div className="space-y-2 px-5 pt-3">
+          {saveError && (
+            <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+              {saveError}
+            </div>
           )}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-zinc-500 dark:text-zinc-400">
-              active
-            </label>
-            <Switch
-              checked={mapping.active}
-              onChange={(checked) => updateField("active", checked)}
-              aria-label="Active"
-            />
-          </div>
-          {isEdit && (
-            <Button
-              plain
-              onClick={() => setDeleteOpen(true)}
-              className="!text-red-600"
-            >
-              Delete
-            </Button>
+          {duplicateError && (
+            <div className="rounded-lg bg-red-100 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200">
+              Duplicate failed: {duplicateError}
+            </div>
+          )}
+          {conflict && (
+            <div className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-200">
+              <div className="font-medium">
+                Server updated this connection since you started.
+              </div>
+              <div className="mt-1 text-xs">
+                Reload to discard your edits and adopt the server state, or
+                save anyway to overwrite.
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button plain onClick={handleReloadFromLive}>
+                  Reload
+                </Button>
+                <Button color="red" onClick={persistSave} disabled={saving}>
+                  {saving ? "Saving…" : "Save anyway"}
+                </Button>
+                <Button plain onClick={dismissConflict}>
+                  Dismiss
+                </Button>
+              </div>
+            </div>
           )}
         </div>
+      )}
 
-        {errorBanner}
-
-        <Section title="Target">
+      {showTargetBlock && (
+        <div className="border-b border-zinc-950/5 px-5 py-4 dark:border-white/10">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            Pick a target
+          </h3>
           <TargetBlock
             mapping={mapping}
             onUpdate={updateField}
             mode={mode.kind}
             layout={variant}
           />
-        </Section>
+        </div>
+      )}
 
-        <Section
-          title="Routes"
-          action={
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">
-              first match wins — order matters
+      {/* Templates */}
+      <div className="border-b border-zinc-950/5 bg-zinc-50/50 px-5 py-3 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            Apply a template
+          </span>
+          <span className="text-[11px] text-zinc-400">
+            applying replaces the current rules · you can edit afterwards
+          </span>
+        </div>
+        {builtinTemplates.length > 0 && (
+          <>
+            <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+              Built-in
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {builtinTemplates.map((t) => (
+                <TemplateCard
+                  key={t.id}
+                  template={t}
+                  selected={appliedTemplateId === t.id}
+                  onClick={() => applyTemplate(t)}
+                  openMenu={openTplMenu}
+                  setOpenMenu={setOpenTplMenu}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        <div className="mb-2 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+          Yours
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {userTemplates.map((t) => (
+            <TemplateCard
+              key={t.id}
+              template={t}
+              selected={appliedTemplateId === t.id}
+              onClick={() => applyTemplate(t)}
+              openMenu={openTplMenu}
+              setOpenMenu={setOpenTplMenu}
+              onDelete={handleTemplateDelete}
+            />
+          ))}
+          <TemplateCard
+            template={{ id: "__new__" }}
+            onSaveAsNew={() => setShowSaveAsTemplate(true)}
+          />
+        </div>
+      </div>
+
+      {/* Rules */}
+      <div className="space-y-2 p-5">
+        <div className="mb-1 flex items-baseline justify-between">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            Rules{" "}
+            <span className="ml-1 font-normal normal-case text-zinc-400">
+              {ruleRows.length}
             </span>
-          }
-        >
-          <div className="space-y-4">
-            <PresetChips
-              onApply={replaceRoutes}
-              currentRoutes={mapping.routes}
-            />
-            <RoutesList
-              routes={mapping.routes}
-              onUpdate={updateRoute}
-              onRemove={removeRoute}
-              onMove={moveRoute}
-              onAdd={(input) =>
-                addRoute(input ? { input, intent: "play" } : undefined)
+          </h3>
+          <span className="text-[11px] text-zinc-400">
+            read top-to-bottom · first match wins
+          </span>
+        </div>
+        {ruleRows.length === 0 ? (
+          <Text className="rounded-xl border border-dashed border-zinc-300 bg-white py-6 text-center text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">
+            No rules yet — apply a template or click <em>Add another rule</em>{" "}
+            below.
+          </Text>
+        ) : (
+          ruleRows.map((r, idx) => (
+            <RuleSentence
+              key={r.id}
+              route={r}
+              hot={hot}
+              lastValue={hot === r.input ? lastValue : null}
+              openPicker={openPicker}
+              setOpenPicker={setOpenPicker}
+              onUpdate={(next) => {
+                const { id: _id, ...rest } = next;
+                void _id;
+                updateRoute(idx, rest);
+              }}
+              onRemove={() => removeRoute(idx)}
+              onParamChange={(damping) =>
+                updateRoute(idx, { ...r, params: { ...r.params, damping } })
               }
+              duplicate={dupeIds.has(r.id)}
             />
+          ))
+        )}
+        <button
+          type="button"
+          onClick={() => addRoute()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 py-2.5 text-[13px] font-medium text-zinc-500 transition hover:border-blue-400 hover:bg-blue-50/40 hover:text-blue-600 dark:border-zinc-700 dark:hover:bg-blue-500/10"
+        >
+          <Plus className="h-3 w-3" />
+          Add another rule
+        </button>
+      </div>
+
+      {/* Advanced — always visible */}
+      <div className="space-y-4 border-t border-zinc-950/5 bg-zinc-50/40 p-5 dark:border-white/10 dark:bg-white/[0.02]">
+        <section>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Target switching{" "}
+              <span className="ml-1 font-normal normal-case text-zinc-400">
+                cycle this connection across multiple targets with one gesture
+              </span>
+            </h3>
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-500">
+              <input
+                type="checkbox"
+                checked={switchEnabled}
+                onChange={(e) => setSwitchEnabled(e.target.checked)}
+                className="h-3.5 w-3.5 accent-blue-600"
+              />
+              on
+            </label>
           </div>
-        </Section>
+          {switchEnabled ? (
+            <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-950/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-zinc-900">
+              <Chip kind="word">Also, when I</Chip>
+              <div className="relative">
+                <Chip
+                  kind="gesture"
+                  onClick={() =>
+                    setShowSwitchGesturePicker(!showSwitchGesturePicker)
+                  }
+                >
+                  {(() => {
+                    const Icon = INPUT_ICON[switchGesture];
+                    return Icon ? <Icon className="h-3 w-3" /> : null;
+                  })()}
+                  {GESTURE_LABEL[switchGesture] ?? switchGesture}
+                </Chip>
+                {showSwitchGesturePicker && (
+                  <GesturePicker
+                    selected={switchGesture}
+                    onPick={(g) => {
+                      setSwitchGesture(g);
+                      setShowSwitchGesturePicker(false);
+                    }}
+                    onClose={() => setShowSwitchGesturePicker(false)}
+                    used={new Set(mapping.routes.map((r) => r.input))}
+                  />
+                )}
+              </div>
+              <Chip kind="word">, cycle to</Chip>
+              {cycleTargets.length === 0 && (
+                <span className="text-[12px] italic text-zinc-400">
+                  — no targets yet —
+                </span>
+              )}
+              {cycleTargets.map((tid) => {
+                const liveLabel =
+                  services
+                    .find((s) => s.type === mapping.service_type)
+                    ?.targets.find((tt) => tt.target === tid)?.label ?? tid;
+                return (
+                  <Chip
+                    key={tid}
+                    kind="target"
+                    editable={false}
+                    onClick={() => toggleCycleTarget(tid)}
+                  >
+                    {liveLabel}
+                    <X className="h-2.5 w-2.5 opacity-50" />
+                  </Chip>
+                );
+              })}
+              <Chip kind="word">.</Chip>
+              <div className="relative ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowTargetPicker(!showTargetPicker)}
+                  className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[12px] text-zinc-500 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 dark:border-zinc-700 dark:hover:bg-purple-500/10"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                  {cycleTargets.length === 0
+                    ? "pick targets"
+                    : "add / edit targets"}
+                </button>
+                {showTargetPicker && (
+                  <TargetPicker
+                    serviceType={mapping.service_type}
+                    currentTarget={mapping.service_target}
+                    selected={cycleTargets}
+                    onToggle={toggleCycleTarget}
+                    onClose={() => setShowTargetPicker(false)}
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-[12px] text-zinc-400 dark:border-white/10">
+              Off — this connection only controls{" "}
+              <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                {targetLabel}
+              </span>
+              .
+            </div>
+          )}
+        </section>
 
-        <CollapsibleSection
-          id="target-switching"
-          variant={variant}
-          mode={mode.kind}
-          heading="Target switching (advanced)"
-          summary={candidateSummary(mapping)}
-        >
-          <TargetSwitchingBox mapping={mapping} onUpdate={updateField} />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          id="feedback"
-          variant={variant}
-          mode={mode.kind}
-          heading="Feedback"
-          summary={feedbackSummary(mapping)}
-        >
-          <FeedbackRail mapping={mapping} onUpdate={updateField} />
-        </CollapsibleSection>
+        <section>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Feedback on the device{" "}
+              <span className="ml-1 font-normal normal-case text-zinc-400">
+                show what&apos;s happening on the LED matrix
+              </span>
+            </h3>
+            <span className="text-[11px] text-zinc-400">
+              {mapping.feedback.length} active
+            </span>
+          </div>
+          <div className="space-y-2">
+            {mapping.feedback.map((f) => {
+              const tpl = feedbackTemplatesFor(mapping.service_type).find(
+                (t) => t.feedback_type === f.feedback_type,
+              );
+              const label = tpl?.label ?? f.feedback_type;
+              return (
+                <div
+                  key={f.feedback_type}
+                  className="group/fb flex items-center gap-3 rounded-xl border border-zinc-950/10 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-zinc-900"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <Settings className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-zinc-900 dark:text-zinc-100">
+                      {label}
+                    </div>
+                    <div className="font-mono text-[10px] text-zinc-500">
+                      on{" "}
+                      <span className="text-zinc-700 dark:text-zinc-300">
+                        {f.state}
+                      </span>{" "}
+                      change →{" "}
+                      <span className="text-zinc-700 dark:text-zinc-300">
+                        {f.feedback_type}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeFeedback(f.feedback_type)}
+                    aria-label="Remove feedback"
+                    className="rounded p-1 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover/fb:opacity-100 dark:hover:bg-rose-500/10"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowFeedbackPicker(!showFeedbackPicker)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 py-2 text-[13px] font-medium text-zinc-500 hover:border-emerald-400 hover:bg-emerald-50/40 hover:text-emerald-700 dark:border-zinc-700 dark:hover:bg-emerald-500/10"
+              >
+                <Plus className="h-3 w-3" />
+                Add feedback
+              </button>
+              {showFeedbackPicker && (
+                <div className="absolute left-1/2 top-full z-30 mt-1.5 -translate-x-1/2">
+                  <FeedbackTemplatePicker
+                    serviceType={mapping.service_type}
+                    used={usedFeedbackIds}
+                    onPick={(tpl) => {
+                      addFeedbackFromTemplate(tpl);
+                      setShowFeedbackPicker(false);
+                    }}
+                    onClose={() => setShowFeedbackPicker(false)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
 
         <CollapsibleSection
           id="identity"
-          variant={variant}
           mode={mode.kind}
           heading="Identity (advanced)"
-          summary={identitySummary(mapping)}
+          summary={`${mapping.edge_id || "(no edge)"} · ${mapping.device_type}/${
+            mapping.device_id || "?"
+          }`}
           defaultOpen={false}
         >
           <IdentityBlock
@@ -463,48 +648,44 @@ export function RoutesEditor({
             mode={mode.kind}
           />
         </CollapsibleSection>
-      </div>
 
-      <div
-        className={
-          isDrawer
-            ? "sticky bottom-0 -mx-6 border-t border-zinc-950/5 bg-white/90 px-6 py-3 backdrop-blur dark:border-white/10 dark:bg-zinc-900/90"
-            : "pt-2"
-        }
-      >
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={saving || conflict !== null}
-            color="blue"
-          >
-            {saving ? "Saving…" : isEdit ? "Save" : "Create connection"}
-          </Button>
-          {isEdit && (
+        {isEdit && (
+          <div className="flex items-center justify-end gap-2 border-t border-zinc-950/5 pt-4 dark:border-white/10">
             <Button
-              type="button"
-              color="orange"
-              onClick={() => tryIt.openFor(mapping)}
-              aria-label="Open Try it panel"
+              plain
+              onClick={handleDuplicate}
+              disabled={duplicating}
+              title="Create a copy of this connection"
             >
-              Try it now
+              {duplicating ? "Duplicating…" : "Duplicate"}
             </Button>
-          )}
-          {onCancel && (
-            <Button type="button" outline onClick={onCancel}>
-              Cancel
+            <Button
+              plain
+              onClick={() => setDeleteOpen(true)}
+              className="!text-red-600"
+            >
+              Delete
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {renderDeleteDialog()}
-    </div>
-  );
+      <TryFooter hot={hot} lastValue={lastValue} recentTarget={targetLabel} />
 
-  function renderDeleteDialog() {
-    if (!mapping) return null;
-    return (
+      {/* Save-as-template modal */}
+      <SaveAsTemplateDialog
+        open={showSaveAsTemplate}
+        onClose={() => setShowSaveAsTemplate(false)}
+        routes={mapping.routes}
+        feedback={mapping.feedback}
+        serviceType={mapping.service_type}
+        onCreated={(created) => {
+          setTemplates([...templates, created]);
+          setShowSaveAsTemplate(false);
+        }}
+      />
+
+      {/* Delete confirmation */}
       <Dialog
         open={deleteOpen}
         onClose={() => (deleting ? null : setDeleteOpen(false))}
@@ -535,72 +716,14 @@ export function RoutesEditor({
           </Button>
         </DialogActions>
       </Dialog>
-    );
-  }
-}
-
-// --- Helpers ------------------------------------------------------------
-
-function Section({
-  title,
-  action,
-  children,
-  compact,
-}: {
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-  compact?: boolean;
-}) {
-  return (
-    <section
-      className={
-        compact
-          ? "space-y-2"
-          : "space-y-3 rounded-lg border border-zinc-950/5 bg-white p-4 dark:border-white/10 dark:bg-zinc-900"
-      }
-    >
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-          {title}
-        </h3>
-        {action}
-      </div>
-      {children}
-    </section>
+      {/* Suppress unused-prop warnings — title is accepted for parent
+          contracts but the new layout uses ConnHeader for visual identity. */}
+      {title ? null : null}
+    </div>
   );
 }
 
-/** Inline (non-collapsible) target-switching section that stays visible as
- * part of the routes flow — the hi-fi treats this as a peer of the routes
- * list, not as an "advanced" hidden block. */
-function InlineTargetSwitchingSection({
-  mapping,
-  onUpdate,
-}: {
-  mapping: Mapping;
-  onUpdate: <K extends keyof Mapping>(key: K, value: Mapping[K]) => void;
-}) {
-  return (
-    <section className="rounded-lg border border-zinc-950/5 bg-zinc-50 p-4 dark:border-white/10 dark:bg-white/5">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-            Target switching{" "}
-            <span className="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
-              advanced
-            </span>
-          </h3>
-          <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-            Let a gesture cycle between multiple targets (e.g. swipe_up →
-            switch zone)
-          </p>
-        </div>
-      </div>
-      <TargetSwitchingBox mapping={mapping} onUpdate={onUpdate} />
-    </section>
-  );
-}
+// --- Identity collapsible (default closed) ----------------------------
 
 const persistedBoolListeners = new Set<() => void>();
 function subscribePersistedBool(cb: () => void): () => void {
@@ -624,7 +747,7 @@ function notifyPersistedBool(): void {
 
 function usePersistedBool(
   key: string,
-  defaultValue: boolean
+  defaultValue: boolean,
 ): [boolean, (v: boolean) => void] {
   const getSnapshot = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -638,7 +761,7 @@ function usePersistedBool(
   const raw = useSyncExternalStore(
     subscribePersistedBool,
     getSnapshot,
-    getServerSnapshot
+    getServerSnapshot,
   );
   const value = raw === null ? defaultValue : raw === "true";
   const set = useCallback(
@@ -651,7 +774,7 @@ function usePersistedBool(
       }
       notifyPersistedBool();
     },
-    [key]
+    [key],
   );
   return [value, set];
 }
@@ -665,7 +788,6 @@ function CollapsibleSection({
   defaultOpen = true,
 }: {
   id: string;
-  variant: RoutesEditorVariant;
   mode: "new" | "edit";
   heading: string;
   summary: string;
@@ -675,8 +797,6 @@ function CollapsibleSection({
   const storageKey = `weave:edit:collapse:${id}`;
   const [open, setOpen] = usePersistedBool(storageKey, defaultOpen);
 
-  // New mappings always render expanded — context matters most for
-  // brand-new authors. Drawer + inline + full all respect localStorage.
   const forceOpen = mode === "new";
   const effectiveOpen = forceOpen ? true : open;
 
@@ -716,24 +836,4 @@ function CollapsibleSection({
       {effectiveOpen && <div className="px-4 pb-4">{children}</div>}
     </section>
   );
-}
-
-function candidateSummary(m: Mapping): string {
-  const n = m.target_candidates?.length ?? 0;
-  if (n === 0) return "No candidates";
-  const sw = m.target_switch_on ?? null;
-  return `${n} candidate${n === 1 ? "" : "s"}${sw ? ` · switch on ${sw}` : ""}`;
-}
-
-function feedbackSummary(m: Mapping): string {
-  const n = m.feedback?.length ?? 0;
-  if (n === 0) return "No rules";
-  const props = m.feedback.map((r) => r.state).filter(Boolean);
-  return `${n} rule${n === 1 ? "" : "s"}${
-    props.length > 0 ? `: ${props.join(", ")}` : ""
-  }`;
-}
-
-function identitySummary(m: Mapping): string {
-  return `${m.edge_id || "(no edge)"} · ${m.device_type}/${m.device_id || "?"}`;
 }

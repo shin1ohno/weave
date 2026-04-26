@@ -4,10 +4,12 @@ pub mod mapping;
 pub mod primitives;
 pub mod route;
 pub mod store;
+pub mod template;
 
 pub use engine::{RoutedIntent, RoutingEngine};
 pub use intents::{Intent, IntentType};
 pub use mapping::{FeedbackRule, Mapping};
 pub use primitives::{Direction, InputPrimitive, InputType, TouchArea};
 pub use route::{Route, RouteParams};
-pub use store::{MappingStore, MemoryStore, StoreError};
+pub use store::{MappingStore, MemoryStore, StoreError, TemplateStore};
+pub use template::Template;
