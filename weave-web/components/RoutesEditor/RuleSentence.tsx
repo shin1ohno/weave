@@ -190,8 +190,9 @@ export function RuleSentence({
         <button
           type="button"
           onClick={onRemove}
-          aria-label="Remove route"
-          className="rounded p-1 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-500/10"
+          aria-label="Remove rule"
+          title="Remove rule"
+          className="rounded p-1 text-zinc-400 transition hover:bg-rose-50 hover:text-rose-600 dark:text-zinc-500 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
         >
           <X aria-hidden className="h-3.5 w-3.5" />
         </button>
