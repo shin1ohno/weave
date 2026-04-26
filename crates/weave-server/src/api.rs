@@ -7,7 +7,8 @@ use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use weave_contracts::{Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame};
-use weave_engine::{Mapping, MappingStore};
+use weave_engine::mapping::TargetCandidate;
+use weave_engine::{FeedbackRule, Mapping, MappingStore, Route};
 
 use crate::ctx::AppCtx;
 
@@ -116,10 +117,50 @@ async fn get_mapping(
     Ok(Json(mapping))
 }
 
+/// Wire payload for `POST /api/mappings`. Mirrors `Mapping` minus
+/// `mapping_id` — the server allocates the UUID so clients (browsers in
+/// non-secure contexts where `crypto.randomUUID` is undefined, lightweight
+/// scripts, etc.) don't need to.
+#[derive(serde::Deserialize)]
+struct CreateMappingRequest {
+    #[serde(default)]
+    edge_id: String,
+    device_type: String,
+    device_id: String,
+    service_type: String,
+    service_target: String,
+    routes: Vec<Route>,
+    #[serde(default)]
+    feedback: Vec<FeedbackRule>,
+    #[serde(default = "default_true")]
+    active: bool,
+    #[serde(default)]
+    target_candidates: Vec<TargetCandidate>,
+    #[serde(default)]
+    target_switch_on: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 async fn create_mapping(
     State(ctx): State<AppCtx>,
-    Json(mapping): Json<Mapping>,
+    Json(req): Json<CreateMappingRequest>,
 ) -> Result<(StatusCode, Json<Mapping>), StatusCode> {
+    let mapping = Mapping {
+        mapping_id: uuid::Uuid::new_v4(),
+        edge_id: req.edge_id,
+        device_type: req.device_type,
+        device_id: req.device_id,
+        service_type: req.service_type,
+        service_target: req.service_target,
+        routes: req.routes,
+        feedback: req.feedback,
+        active: req.active,
+        target_candidates: req.target_candidates,
+        target_switch_on: req.target_switch_on,
+    };
     ctx.store
         .create_mapping(&mapping)
         .await

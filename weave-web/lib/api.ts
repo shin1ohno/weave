@@ -185,7 +185,7 @@ export async function createMapping(
   const res = await fetch(`${API_BASE}/api/mappings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...mapping, mapping_id: crypto.randomUUID() }),
+    body: JSON.stringify(mapping),
   });
   if (!res.ok) throw new Error(`Failed to create mapping: ${res.status}`);
   return res.json();
