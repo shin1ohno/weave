@@ -34,6 +34,7 @@ import {
   Cpu,
   Send,
   AlertCircle,
+  Disc3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -56,6 +57,19 @@ export const INPUT_ICON: Record<string, LucideIcon> = {
   touch_left: ArrowLeft,
   touch_right: ArrowRight,
   key_press: Keyboard,
+  // Hue Tap Dial: numbered buttons share the same Circle icon as a
+  // generic press; each maps to its own route input string.
+  button_1: Circle,
+  button_2: Circle,
+  button_3: Circle,
+  button_4: Circle,
+};
+
+/** Maps device_type → lucide icon. Used by tiles and the input-stream
+ * panel to identify the source of an event. Nuimo has its own bespoke
+ * NuimoViz visual rendered separately; this map covers the rest. */
+export const DEVICE_ICON: Record<string, LucideIcon> = {
+  hue_tap_dial: Disc3,
 };
 
 /** Maps service_type → lucide icon. Roon = Play, Hue = Lightbulb. Extend as
@@ -97,6 +111,7 @@ export {
   Cpu,
   Send,
   AlertCircle,
+  Disc3,
 };
 
 export type { LucideIcon };

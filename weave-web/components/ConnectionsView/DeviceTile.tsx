@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Battery, Link2, WifiOff } from "@/components/icon";
+import { Battery, DEVICE_ICON, Link2, WifiOff } from "@/components/icon";
 import { Badge } from "@/components/ui/badge";
 import type { DeviceSummary } from "@/lib/devices";
 import type { LastInput } from "@/lib/ws";
@@ -13,6 +13,36 @@ interface Props {
   lastInput: LastInput | null;
   firing: boolean;
   onClick: () => void;
+}
+
+/** Pick the visual representation for the tile's leading slot.
+ *
+ * Nuimo gets its bespoke `NuimoViz` (LED matrix preview keyed off the
+ * `led` device-state property). Every other device_type falls back to a
+ * lucide icon from `DEVICE_ICON`; if no icon is registered, the slot
+ * stays empty rather than showing a misleading Nuimo silhouette. */
+function DeviceVisual({
+  device,
+  firing,
+}: {
+  device: DeviceSummary;
+  firing: boolean;
+}) {
+  if (device.device_type === "nuimo") {
+    return <NuimoViz pattern={device.led} size={56} firing={firing} />;
+  }
+  const Icon = DEVICE_ICON[device.device_type];
+  if (!Icon) return <div className="h-14 w-14" />;
+  return (
+    <div
+      className={clsx(
+        "flex h-14 w-14 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400",
+        firing && "ring-2 ring-orange-500"
+      )}
+    >
+      <Icon className="h-8 w-8" />
+    </div>
+  );
 }
 
 function batteryColor(
@@ -49,7 +79,7 @@ export function DeviceTile({
       )}
     >
       <div className="flex items-start gap-3">
-        <NuimoViz pattern={device.led} size={56} firing={firing} />
+        <DeviceVisual device={device} firing={firing} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <div className="truncate text-base font-semibold text-zinc-950 dark:text-white">
