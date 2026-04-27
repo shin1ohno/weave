@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { deleteMapping, type Mapping } from "@/lib/api";
 import type { DeviceSummary } from "@/lib/devices";
 import type { ServiceTarget } from "@/lib/services";
-import { useDeviceCycle } from "@/lib/ws";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -79,22 +78,16 @@ export function ConnectionCard({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Cycle membership: when a DeviceCycle covers this mapping's device,
-  // the cycle's active_mapping_id is the only one that actually routes
-  // input. Other cycle members sit dormant. Surface that distinction —
-  // otherwise every Connection in the cycle looks equally "live".
-  const cycle = useDeviceCycle(mapping.device_type, mapping.device_id);
-  const inCycle = cycle?.mapping_ids.includes(mapping.mapping_id) ?? false;
-  const isCycleActive = cycle?.active_mapping_id === mapping.mapping_id;
-  const isCycleIdle = inCycle && !isCycleActive;
-
+  // `mapping.active` is the source of truth for "currently routing":
+  // server enforces single-active-per-device, so a `false` here means
+  // the device's other Connection is the live one. The legacy "soft
+  // disable" semantic and the cycle-idle case both flow through this
+  // same flag now.
   const variant = firing
     ? "firing"
     : !mapping.active
       ? "inactive"
-      : isCycleIdle
-        ? "cycle_idle"
-        : "default";
+      : "default";
 
   const deviceName =
     device?.nickname ?? mapping.device_id.slice(-8) ?? mapping.device_id;
@@ -250,7 +243,7 @@ export function ConnectionCard({
         </button>
       </div>
 
-      {(feedbackStates || !mapping.active || inCycle || lastEvent) && (
+      {(feedbackStates || !mapping.active || lastEvent) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-500 dark:border-white/5">
           {feedbackStates && (
             <span>
@@ -258,8 +251,6 @@ export function ConnectionCard({
             </span>
           )}
           {!mapping.active && <Badge color="zinc">inactive</Badge>}
-          {isCycleActive && <Badge color="emerald">active in cycle</Badge>}
-          {isCycleIdle && <Badge color="zinc">cycle idle</Badge>}
           {lastEvent && (
             <span className="ml-auto font-mono text-[11px]">{lastEvent}</span>
           )}

@@ -92,6 +92,21 @@ async fn create_mapping(
     State(ctx): State<AppCtx>,
     Json(req): Json<CreateMappingRequest>,
 ) -> Result<(StatusCode, Json<Mapping>), StatusCode> {
+    // Single-active-per-device invariant: if any mapping on this device
+    // is already active, the new one must come up dormant. The user can
+    // promote it later via the cycle-switch flow. If no sibling is
+    // active, the new mapping inherits whatever the request sent (default
+    // true) so it becomes the device's first active.
+    let siblings = ctx
+        .store
+        .list_mappings()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let device_has_active = siblings
+        .iter()
+        .any(|m| m.device_type == req.device_type && m.device_id == req.device_id && m.active);
+    let resolved_active = if device_has_active { false } else { req.active };
+
     let mapping = Mapping {
         mapping_id: uuid::Uuid::new_v4(),
         edge_id: req.edge_id,
@@ -101,7 +116,7 @@ async fn create_mapping(
         service_target: req.service_target,
         routes: req.routes,
         feedback: req.feedback,
-        active: req.active,
+        active: resolved_active,
         target_candidates: req.target_candidates,
         target_switch_on: req.target_switch_on,
     };
@@ -130,6 +145,30 @@ async fn update_mapping(
         })?;
     ctx.engine.upsert_mapping(mapping.clone()).await;
     push_mapping_upsert(&ctx, &mapping);
+
+    // Single-active-per-device invariant: if the user just promoted this
+    // mapping to active, demote every other active sibling on the same
+    // device. Each demotion broadcasts a separate MappingChanged so
+    // edges + UIs converge.
+    if mapping.active {
+        let siblings = ctx.store.list_mappings().await.unwrap_or_default();
+        for m in siblings {
+            if m.mapping_id == mapping.mapping_id {
+                continue;
+            }
+            if m.device_type != mapping.device_type || m.device_id != mapping.device_id || !m.active
+            {
+                continue;
+            }
+            let mut demoted = m.clone();
+            demoted.active = false;
+            if ctx.store.update_mapping(&demoted).await.is_err() {
+                continue;
+            }
+            ctx.engine.upsert_mapping(demoted.clone()).await;
+            push_mapping_upsert(&ctx, &demoted);
+        }
+    }
     Ok(Json(mapping))
 }
 
@@ -144,8 +183,8 @@ async fn delete_mapping(State(ctx): State<AppCtx>, Path(id): Path<String>) -> St
     match ctx.store.delete_mapping(&uuid).await {
         Ok(true) => {
             ctx.engine.remove_mapping(uuid).await;
-            if let Some(m) = existing {
-                push_mapping_delete(&ctx, &m);
+            if let Some(m) = &existing {
+                push_mapping_delete(&ctx, m);
             } else {
                 ctx.hub.broadcast(UiFrame::MappingChanged {
                     mapping_id: uuid,
@@ -153,6 +192,36 @@ async fn delete_mapping(State(ctx): State<AppCtx>, Path(id): Path<String>) -> St
                     mapping: None,
                 });
             }
+
+            // Single-active invariant: if the deleted mapping was the
+            // device's active, promote a remaining sibling so the
+            // device doesn't end up dormant. Stable choice: smallest
+            // mapping_id.
+            if let Some(deleted) = existing {
+                if deleted.active {
+                    if let Ok(remaining) = ctx.store.list_mappings().await {
+                        let mut on_device: Vec<_> = remaining
+                            .into_iter()
+                            .filter(|m| {
+                                m.device_type == deleted.device_type
+                                    && m.device_id == deleted.device_id
+                            })
+                            .collect();
+                        on_device.sort_by_key(|m| m.mapping_id);
+                        if let Some(promote) = on_device.into_iter().next() {
+                            if !promote.active {
+                                let mut updated = promote.clone();
+                                updated.active = true;
+                                if ctx.store.update_mapping(&updated).await.is_ok() {
+                                    ctx.engine.upsert_mapping(updated.clone()).await;
+                                    push_mapping_upsert(&ctx, &updated);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             StatusCode::NO_CONTENT
         }
         Ok(false) => StatusCode::NOT_FOUND,
@@ -349,6 +418,12 @@ async fn switch_cycle_active(
 
 /// Shared cycle-switch path: invoked by REST `POST .../cycle/switch` and
 /// by WS `EdgeToServer::SwitchActiveConnection`. Returns true on success.
+///
+/// In addition to flipping the cycle's `active_mapping_id`, this enforces
+/// the single-active-per-device invariant on `mapping.active`: the target
+/// mapping is set to `active = true` and every other mapping on the same
+/// device is set to `active = false`. Each affected mapping is broadcast
+/// as `MappingChanged` so connected edges and web UIs converge.
 pub async fn apply_cycle_switch_active(
     ctx: &AppCtx,
     device_type: &str,
@@ -372,6 +447,36 @@ pub async fn apply_cycle_switch_active(
     if !persisted {
         return false;
     }
+
+    // Flip mapping.active across all device-siblings: target → true, rest → false.
+    let Ok(siblings) = ctx.store.list_mappings().await else {
+        return false;
+    };
+    let mut changed = Vec::new();
+    for m in siblings {
+        if m.device_type != device_type || m.device_id != device_id {
+            continue;
+        }
+        let should_be_active = m.mapping_id == active_mapping_id;
+        if m.active == should_be_active {
+            continue;
+        }
+        let mut updated = m.clone();
+        updated.active = should_be_active;
+        if ctx.store.update_mapping(&updated).await.is_err() {
+            tracing::warn!(
+                mapping_id = %updated.mapping_id,
+                "failed to flip mapping.active during cycle switch"
+            );
+            continue;
+        }
+        ctx.engine.upsert_mapping(updated.clone()).await;
+        changed.push(updated);
+    }
+    for m in &changed {
+        push_mapping_upsert(ctx, m);
+    }
+
     let Ok(Some(cycle)) = ctx.store.get_cycle(device_type, device_id).await else {
         return false;
     };
