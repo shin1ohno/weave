@@ -247,18 +247,6 @@ export async function deleteMapping(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete mapping: ${res.status}`);
 }
 
-export async function switchTarget(
-  id: string,
-  serviceTarget: string
-): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/mappings/${id}/target`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ service_target: serviceTarget }),
-  });
-  if (!res.ok) throw new Error(`Failed to switch target: ${res.status}`);
-}
-
 // --- Device cycles ---
 
 export async function getDeviceCycle(

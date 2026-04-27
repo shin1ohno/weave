@@ -16,13 +16,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
-import { INPUT_ICON, Plus, Settings, X } from "@/components/icon";
+import { Plus, Settings, X } from "@/components/icon";
 import { useMappingDraft, type DraftMode } from "@/hooks/useMappingDraft";
 import {
   createMapping,
   type FeedbackRule,
   type Mapping,
-  type TargetCandidate,
 } from "@/lib/api";
 import { summarizeDevices } from "@/lib/devices";
 import { summarizeServices } from "@/lib/services";
@@ -38,16 +37,13 @@ import {
   listTemplates,
   type Template,
 } from "@/lib/templates";
-import { GESTURE_LABEL, feedbackTemplatesFor } from "./vocab";
-import { Chip } from "./Chip";
+import { feedbackTemplatesFor } from "./vocab";
 import { ConnHeader } from "./ConnHeader";
 import { FeedbackTemplatePicker } from "./FeedbackTemplatePicker";
-import { GesturePicker } from "./GesturePicker";
 import { IdentityBlock } from "./IdentityBlock";
 import { RuleSentence } from "./RuleSentence";
 import { SaveAsTemplateDialog } from "./SaveAsTemplateDialog";
 import { TargetBlock } from "./TargetBlock";
-import { TargetPicker } from "./TargetPicker";
 import { TemplateCard } from "./TemplateCard";
 import { TryFooter } from "./TryFooter";
 
@@ -121,8 +117,6 @@ export function RoutesEditor({
   const [openPicker, setOpenPicker] = useState<string | null>(null);
   const [openTplMenu, setOpenTplMenu] = useState<string | null>(null);
   const [showSaveAsTemplate, setShowSaveAsTemplate] = useState(false);
-  const [showSwitchGesturePicker, setShowSwitchGesturePicker] = useState(false);
-  const [showTargetPicker, setShowTargetPicker] = useState(false);
   const [showFeedbackPicker, setShowFeedbackPicker] = useState(false);
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
     null,
@@ -190,34 +184,6 @@ export function RoutesEditor({
     replaceRoutes(t.routes);
     updateField("feedback", t.feedback);
     setAppliedTemplateId(t.id);
-  };
-
-  const switchEnabled = (mapping.target_switch_on ?? null) !== null;
-  const switchGesture = mapping.target_switch_on ?? "swipe_up";
-  const cycleTargets = mapping.target_candidates.map((c) => c.target);
-
-  const setSwitchEnabled = (enabled: boolean) => {
-    updateField("target_switch_on", enabled ? switchGesture : null);
-    if (!enabled) updateField("target_candidates", []);
-  };
-  const setSwitchGesture = (g: string) =>
-    updateField("target_switch_on", g);
-  const toggleCycleTarget = (tid: string) => {
-    const present = cycleTargets.includes(tid);
-    if (present) {
-      const next = mapping.target_candidates.filter((c) => c.target !== tid);
-      updateField("target_candidates", next);
-      return;
-    }
-    const liveLabel =
-      services
-        .find((s) => s.type === mapping.service_type)
-        ?.targets.find((tt) => tt.target === tid)?.label ?? "";
-    const next: TargetCandidate[] = [
-      ...mapping.target_candidates,
-      { target: tid, label: liveLabel, glyph: "" },
-    ];
-    updateField("target_candidates", next);
   };
 
   const usedFeedbackIds = new Set(
@@ -451,112 +417,11 @@ export function RoutesEditor({
         </button>
       </div>
 
-      {/* Advanced — always visible */}
+      {/* Advanced — always visible. Target switching has moved to the
+          DeviceTile's CycleSection (device-level cycle of multiple
+          Connections). The per-Connection target_switch_on /
+          target_candidates pair is retired. */}
       <div className="space-y-4 border-t border-zinc-950/5 bg-zinc-50/40 p-5 dark:border-white/10 dark:bg-white/[0.02]">
-        <section>
-          <div className="mb-1.5 flex items-baseline justify-between">
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-              Target switching{" "}
-              <span className="ml-1 font-normal normal-case text-zinc-400">
-                cycle this connection across multiple targets with one gesture
-              </span>
-            </h3>
-            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-zinc-500">
-              <input
-                type="checkbox"
-                checked={switchEnabled}
-                onChange={(e) => setSwitchEnabled(e.target.checked)}
-                className="h-3.5 w-3.5 accent-blue-600"
-              />
-              on
-            </label>
-          </div>
-          {switchEnabled ? (
-            <div className="flex flex-wrap items-center gap-1 rounded-xl border border-zinc-950/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-zinc-900">
-              <Chip kind="word">Also, when I</Chip>
-              <div className="relative">
-                <Chip
-                  kind="gesture"
-                  onClick={() =>
-                    setShowSwitchGesturePicker(!showSwitchGesturePicker)
-                  }
-                >
-                  {(() => {
-                    const Icon = INPUT_ICON[switchGesture];
-                    return Icon ? <Icon className="h-3 w-3" /> : null;
-                  })()}
-                  {GESTURE_LABEL[switchGesture] ?? switchGesture}
-                </Chip>
-                {showSwitchGesturePicker && (
-                  <GesturePicker
-                    selected={switchGesture}
-                    onPick={(g) => {
-                      setSwitchGesture(g);
-                      setShowSwitchGesturePicker(false);
-                    }}
-                    onClose={() => setShowSwitchGesturePicker(false)}
-                    used={new Set(mapping.routes.map((r) => r.input))}
-                    deviceType={mapping.device_type}
-                  />
-                )}
-              </div>
-              <Chip kind="word">, cycle to</Chip>
-              {cycleTargets.length === 0 && (
-                <span className="text-[12px] italic text-zinc-400">
-                  — no targets yet —
-                </span>
-              )}
-              {cycleTargets.map((tid) => {
-                const liveLabel =
-                  services
-                    .find((s) => s.type === mapping.service_type)
-                    ?.targets.find((tt) => tt.target === tid)?.label ?? tid;
-                return (
-                  <Chip
-                    key={tid}
-                    kind="target"
-                    editable={false}
-                    onClick={() => toggleCycleTarget(tid)}
-                  >
-                    {liveLabel}
-                    <X className="h-2.5 w-2.5 opacity-50" />
-                  </Chip>
-                );
-              })}
-              <Chip kind="word">.</Chip>
-              <div className="relative ml-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowTargetPicker(!showTargetPicker)}
-                  className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-1 text-[12px] text-zinc-500 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 dark:border-zinc-700 dark:hover:bg-purple-500/10"
-                >
-                  <Plus className="h-2.5 w-2.5" />
-                  {cycleTargets.length === 0
-                    ? "pick targets"
-                    : "add / edit targets"}
-                </button>
-                {showTargetPicker && (
-                  <TargetPicker
-                    serviceType={mapping.service_type}
-                    currentTarget={mapping.service_target}
-                    selected={cycleTargets}
-                    onToggle={toggleCycleTarget}
-                    onClose={() => setShowTargetPicker(false)}
-                  />
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-[12px] text-zinc-400 dark:border-white/10">
-              Off — this connection only controls{" "}
-              <span className="font-medium text-zinc-600 dark:text-zinc-300">
-                {targetLabel}
-              </span>
-              .
-            </div>
-          )}
-        </section>
-
         <section>
           <div className="mb-1.5 flex items-baseline justify-between">
             <h3 className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">

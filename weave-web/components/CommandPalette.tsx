@@ -36,7 +36,7 @@ export function CommandPalette() {
     deviceStates,
   } = useUIState();
   const router = useRouter();
-  const { setSelectedId, requestAction } = useRowSelection();
+  const { setSelectedId } = useRowSelection();
   const [, setSelectedDevice] = useSelectedDevice();
   const { theme, toggle: toggleTheme } = useTheme();
 
@@ -56,42 +56,6 @@ export function CommandPalette() {
     return `${deviceName} → ${m.service_type}/${tgt}`;
   }
 
-  // Mappings that can be target-switched — either explicit candidates
-  // or multiple live targets on the same service_type.
-  const knownTargetsByService = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const s of serviceStates) {
-      const metaProperty =
-        s.service_type === "hue"
-          ? "light"
-          : s.service_type === "roon"
-            ? "zone"
-            : null;
-      if (metaProperty === null) continue;
-      if (s.property !== metaProperty) continue;
-      if (!map.has(s.service_type)) map.set(s.service_type, new Set());
-      map.get(s.service_type)!.add(s.target);
-    }
-    return map;
-  }, [serviceStates]);
-
-  const switchableMappings = useMemo(
-    () =>
-      mappings.filter((m) => {
-        if ((m.target_candidates?.length ?? 0) > 0) return true;
-        const live = knownTargetsByService.get(m.service_type);
-        if (!live) return false;
-        if (live.size > 1) return true;
-        return live.size === 1 && !live.has(m.service_target);
-      }),
-    [mappings, knownTargetsByService]
-  );
-
-  function rowIdForMapping(m: Mapping): string | null {
-    if (m.service_type === "roon") return `zone:roon:${m.service_target}`;
-    if (m.service_type === "hue") return `light:hue:${m.service_target}`;
-    return null;
-  }
 
   function run(action: () => void) {
     closePalette();
@@ -224,21 +188,6 @@ export function CommandPalette() {
             >
               Open glyph gallery
             </PaletteItem>
-            {switchableMappings.map((m) => (
-              <PaletteItem
-                key={`switch:${m.mapping_id}`}
-                value={`switch target ${mappingLabel(m)} ${m.mapping_id}`}
-                onSelect={() =>
-                  run(() => {
-                    const rowId = rowIdForMapping(m);
-                    if (rowId) setSelectedId(rowId);
-                    requestAction({ mappingId: m.mapping_id, kind: "switch" });
-                  })
-                }
-              >
-                Switch target · {mappingLabel(m)}
-              </PaletteItem>
-            ))}
           </Group>
 
           {edges.length > 0 && (

@@ -25,10 +25,8 @@ import {
   Volume2,
   ChevronDown,
   Trash2,
-  INPUT_ICON,
 } from "@/components/icon";
 import { RoutesEditor } from "@/components/RoutesEditor";
-import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
 import { NuimoViz } from "./NuimoViz";
 import { RoutePill } from "./RoutePill";
 
@@ -94,9 +92,6 @@ export function ConnectionCard({
     [mapping.feedback]
   );
 
-  const SwitchOnIcon = mapping.target_switch_on
-    ? INPUT_ICON[mapping.target_switch_on]
-    : null;
 
   async function confirmDelete() {
     setDeleting(true);
@@ -187,7 +182,6 @@ export function ConnectionCard({
 
         <div className="ml-auto flex items-center gap-2">
           <StatusChip target={target} />
-          <SwitchTargetPopover mapping={mapping} />
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
@@ -243,21 +237,11 @@ export function ConnectionCard({
         </button>
       </div>
 
-      {(feedbackStates || mapping.target_switch_on || !mapping.active || lastEvent) && (
+      {(feedbackStates || !mapping.active || lastEvent) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-500 dark:border-white/5">
           {feedbackStates && (
             <span>
               Feedback: <span className="font-mono">{feedbackStates}</span>
-            </span>
-          )}
-          {mapping.target_switch_on && (
-            <span className="inline-flex items-center gap-1">
-              Switch on{" "}
-              {SwitchOnIcon && (
-                <SwitchOnIcon className="h-3 w-3 text-zinc-400" />
-              )}
-              <span className="font-mono">{mapping.target_switch_on}</span>{" "}
-              ({mapping.target_candidates.length} options)
             </span>
           )}
           {!mapping.active && <Badge color="zinc">inactive</Badge>}
