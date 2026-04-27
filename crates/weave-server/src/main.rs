@@ -2,6 +2,7 @@ mod api;
 mod ctx;
 mod devices;
 mod glyphs;
+mod migrate_target_candidates;
 mod mqtt;
 mod push_broker;
 mod sqlite_store;
@@ -47,9 +48,22 @@ async fn main() -> anyhow::Result<()> {
     glyphs::seed_defaults(&store).await?;
     templates::seed_builtins(&store).await?;
 
+    // Idempotent: expands legacy `target_candidates` / `target_switch_on`
+    // into separate Mapping rows + a DeviceCycle row per affected device.
+    // Subsequent restarts find nothing to do and return 0.
+    let migrated_cycles = migrate_target_candidates::migrate_target_candidates(&store).await?;
+    if migrated_cycles > 0 {
+        tracing::info!(
+            count = migrated_cycles,
+            "migrated legacy target_candidates → device_cycles"
+        );
+    }
+
     let engine = Arc::new(RoutingEngine::new());
     let mappings = store.list_mappings().await?;
     engine.load_mappings(mappings).await;
+    let cycles = store.list_cycles().await?;
+    engine.load_cycles(cycles).await;
 
     let hub = Arc::new(StateHub::new());
     let broker = Arc::new(PushBroker::new());

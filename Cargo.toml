@@ -18,3 +18,14 @@ thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
+
+# TEMPORARY [patch.crates-io] for the device-cycle protocol additions.
+# weave-contracts 0.11.0 (DeviceCycle, DeviceCyclePatch, SwitchActiveConnection,
+# DeviceCycleChanged variants + EdgeConfig.device_cycles / UiSnapshot.device_cycles)
+# lives on the feat/device-cycle-protocol branch in edge-agent (PR #69).
+#
+# Remove this block before the weave PR that bumps the dep to "0.11" merges —
+# that needs the version live on crates.io. Local development against the
+# sibling checkout keeps building unblocked while release-plz cycles through.
+[patch.crates-io]
+weave-contracts = { path = "../edge-agent/crates/weave-contracts" }

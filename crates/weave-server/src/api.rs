@@ -6,8 +6,10 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
-use weave_contracts::{Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame};
-use weave_engine::mapping::TargetCandidate;
+use weave_contracts::{
+    DeviceCycle as ContractDeviceCycle, Mapping as ContractMapping, PatchOp, ServerToEdge, UiFrame,
+};
+use weave_engine::mapping::{DeviceCycle, TargetCandidate};
 use weave_engine::{FeedbackRule, Mapping, MappingStore, Route};
 
 use crate::ctx::AppCtx;
@@ -19,7 +21,15 @@ pub fn router() -> Router<AppCtx> {
         .route("/api/mappings/:id", get(get_mapping))
         .route("/api/mappings/:id", put(update_mapping))
         .route("/api/mappings/:id", delete(delete_mapping))
-        .route("/api/mappings/{id}/target", post(switch_target))
+        .route("/api/mappings/:id/target", post(switch_target))
+        .route(
+            "/api/devices/:device_type/:device_id/cycle",
+            get(get_cycle).put(put_cycle).delete(delete_cycle),
+        )
+        .route(
+            "/api/devices/:device_type/:device_id/cycle/switch",
+            post(switch_cycle_active),
+        )
 }
 
 fn to_contract(m: &Mapping) -> Option<ContractMapping> {
@@ -233,4 +243,199 @@ fn push_mapping_delete(ctx: &AppCtx, mapping: &Mapping) {
         op: PatchOp::Delete,
         mapping: None,
     });
+}
+
+// --- Device cycle CRUD -------------------------------------------------
+
+fn cycle_to_contract(c: &DeviceCycle) -> ContractDeviceCycle {
+    ContractDeviceCycle {
+        device_type: c.device_type.clone(),
+        device_id: c.device_id.clone(),
+        mapping_ids: c.mapping_ids.clone(),
+        active_mapping_id: c.active_mapping_id,
+        cycle_gesture: c.cycle_gesture.clone(),
+    }
+}
+
+async fn get_cycle(
+    State(ctx): State<AppCtx>,
+    Path((device_type, device_id)): Path<(String, String)>,
+) -> Result<Json<DeviceCycle>, StatusCode> {
+    let cycle = ctx
+        .store
+        .get_cycle(&device_type, &device_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    Ok(Json(cycle))
+}
+
+#[derive(serde::Deserialize)]
+struct PutCycleBody {
+    mapping_ids: Vec<uuid::Uuid>,
+    #[serde(default)]
+    active_mapping_id: Option<uuid::Uuid>,
+    #[serde(default)]
+    cycle_gesture: Option<String>,
+}
+
+async fn put_cycle(
+    State(ctx): State<AppCtx>,
+    Path((device_type, device_id)): Path<(String, String)>,
+    Json(body): Json<PutCycleBody>,
+) -> Result<Json<DeviceCycle>, StatusCode> {
+    if body.mapping_ids.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let active = body
+        .active_mapping_id
+        .filter(|id| body.mapping_ids.contains(id))
+        .or_else(|| body.mapping_ids.first().copied());
+    let cycle = DeviceCycle {
+        device_type: device_type.clone(),
+        device_id: device_id.clone(),
+        mapping_ids: body.mapping_ids,
+        active_mapping_id: active,
+        cycle_gesture: body.cycle_gesture,
+    };
+    ctx.store
+        .upsert_cycle(&cycle)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    ctx.engine.upsert_cycle(cycle.clone()).await;
+    push_cycle_change(&ctx, &cycle, PatchOp::Upsert).await;
+    Ok(Json(cycle))
+}
+
+async fn delete_cycle(
+    State(ctx): State<AppCtx>,
+    Path((device_type, device_id)): Path<(String, String)>,
+) -> StatusCode {
+    let existed = match ctx.store.delete_cycle(&device_type, &device_id).await {
+        Ok(b) => b,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    if !existed {
+        return StatusCode::NOT_FOUND;
+    }
+    ctx.engine.remove_cycle(&device_type, &device_id).await;
+    let placeholder = DeviceCycle {
+        device_type: device_type.clone(),
+        device_id: device_id.clone(),
+        mapping_ids: Vec::new(),
+        active_mapping_id: None,
+        cycle_gesture: None,
+    };
+    push_cycle_change(&ctx, &placeholder, PatchOp::Delete).await;
+    StatusCode::NO_CONTENT
+}
+
+#[derive(serde::Deserialize)]
+struct SwitchCycleActiveBody {
+    active_mapping_id: uuid::Uuid,
+}
+
+async fn switch_cycle_active(
+    State(ctx): State<AppCtx>,
+    Path((device_type, device_id)): Path<(String, String)>,
+    Json(body): Json<SwitchCycleActiveBody>,
+) -> StatusCode {
+    if apply_cycle_switch_active(&ctx, &device_type, &device_id, body.active_mapping_id).await {
+        StatusCode::OK
+    } else {
+        StatusCode::NOT_FOUND
+    }
+}
+
+/// Shared cycle-switch path: invoked by REST `POST .../cycle/switch` and
+/// by WS `EdgeToServer::SwitchActiveConnection`. Returns true on success.
+pub async fn apply_cycle_switch_active(
+    ctx: &AppCtx,
+    device_type: &str,
+    device_id: &str,
+    active_mapping_id: uuid::Uuid,
+) -> bool {
+    if !ctx
+        .engine
+        .set_active(device_type, device_id, active_mapping_id)
+        .await
+    {
+        return false;
+    }
+    let Ok(persisted) = ctx
+        .store
+        .set_cycle_active(device_type, device_id, active_mapping_id)
+        .await
+    else {
+        return false;
+    };
+    if !persisted {
+        return false;
+    }
+    let Ok(Some(cycle)) = ctx.store.get_cycle(device_type, device_id).await else {
+        return false;
+    };
+    push_cycle_change(ctx, &cycle, PatchOp::Upsert).await;
+    push_cycle_active_to_edges(ctx, device_type, device_id, active_mapping_id).await;
+    true
+}
+
+async fn push_cycle_change(ctx: &AppCtx, cycle: &DeviceCycle, op: PatchOp) {
+    let contract = cycle_to_contract(cycle);
+    let frame_cycle = if matches!(op, PatchOp::Delete) {
+        None
+    } else {
+        Some(contract.clone())
+    };
+    ctx.hub.broadcast(UiFrame::DeviceCycleChanged {
+        device_type: cycle.device_type.clone(),
+        device_id: cycle.device_id.clone(),
+        op,
+        cycle: frame_cycle,
+    });
+    let edges = edges_for_device(ctx, &cycle.device_type, &cycle.device_id).await;
+    for edge_id in edges {
+        ctx.broker.send_to_edge(
+            &edge_id,
+            ServerToEdge::DeviceCyclePatch {
+                cycle: contract.clone(),
+                op,
+            },
+        );
+    }
+}
+
+async fn push_cycle_active_to_edges(
+    ctx: &AppCtx,
+    device_type: &str,
+    device_id: &str,
+    active_mapping_id: uuid::Uuid,
+) {
+    let edges = edges_for_device(ctx, device_type, device_id).await;
+    for edge_id in edges {
+        ctx.broker.send_to_edge(
+            &edge_id,
+            ServerToEdge::SwitchActiveConnection {
+                device_type: device_type.to_string(),
+                device_id: device_id.to_string(),
+                active_mapping_id,
+            },
+        );
+    }
+}
+
+/// Edge IDs that own at least one mapping referencing this device.
+async fn edges_for_device(
+    ctx: &AppCtx,
+    device_type: &str,
+    device_id: &str,
+) -> std::collections::HashSet<String> {
+    ctx.engine
+        .list_mappings()
+        .await
+        .into_iter()
+        .filter(|m| m.device_type == device_type && m.device_id == device_id)
+        .map(|m| m.edge_id)
+        .filter(|e| !e.is_empty())
+        .collect()
 }

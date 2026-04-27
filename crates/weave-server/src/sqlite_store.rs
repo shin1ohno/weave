@@ -9,7 +9,7 @@ use sqlx::ConnectOptions;
 use std::str::FromStr;
 
 use weave_contracts::Glyph;
-use weave_engine::mapping::FeedbackRule;
+use weave_engine::mapping::{DeviceCycle, FeedbackRule};
 use weave_engine::route::Route;
 use weave_engine::{Mapping, MappingStore, StoreError, Template, TemplateStore};
 
@@ -88,6 +88,98 @@ impl SqliteStore {
             .await
             .map_err(|e| StoreError::Internal(e.to_string()))?;
         Ok(n)
+    }
+
+    /// List every device cycle row.
+    pub async fn list_cycles(&self) -> Result<Vec<DeviceCycle>, StoreError> {
+        let rows: Vec<DeviceCycleRow> = sqlx::query_as(
+            "SELECT device_type, device_id, cycle_gesture, active_mapping_id, mapping_ids_json \
+             FROM device_cycles",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        rows.into_iter().map(row_to_cycle).collect()
+    }
+
+    /// Fetch the cycle row for one device, if any.
+    pub async fn get_cycle(
+        &self,
+        device_type: &str,
+        device_id: &str,
+    ) -> Result<Option<DeviceCycle>, StoreError> {
+        let row: Option<DeviceCycleRow> = sqlx::query_as(
+            "SELECT device_type, device_id, cycle_gesture, active_mapping_id, mapping_ids_json \
+             FROM device_cycles WHERE device_type = ? AND device_id = ?",
+        )
+        .bind(device_type)
+        .bind(device_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        row.map(row_to_cycle).transpose()
+    }
+
+    /// Insert or replace a cycle row.
+    pub async fn upsert_cycle(&self, cycle: &DeviceCycle) -> Result<(), StoreError> {
+        let mapping_ids_json = serde_json::to_string(&cycle.mapping_ids)
+            .map_err(|e| StoreError::Internal(e.to_string()))?;
+        sqlx::query(
+            "INSERT INTO device_cycles \
+             (device_type, device_id, cycle_gesture, active_mapping_id, mapping_ids_json) \
+             VALUES (?, ?, ?, ?, ?) \
+             ON CONFLICT(device_type, device_id) DO UPDATE SET \
+                cycle_gesture = excluded.cycle_gesture, \
+                active_mapping_id = excluded.active_mapping_id, \
+                mapping_ids_json = excluded.mapping_ids_json",
+        )
+        .bind(&cycle.device_type)
+        .bind(&cycle.device_id)
+        .bind(cycle.cycle_gesture.as_deref())
+        .bind(cycle.active_mapping_id.map(|u| u.to_string()))
+        .bind(mapping_ids_json)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Update only the active mapping ID. Returns false if no row exists
+    /// for the given device.
+    pub async fn set_cycle_active(
+        &self,
+        device_type: &str,
+        device_id: &str,
+        active_mapping_id: uuid::Uuid,
+    ) -> Result<bool, StoreError> {
+        let rows = sqlx::query(
+            "UPDATE device_cycles SET active_mapping_id = ? \
+             WHERE device_type = ? AND device_id = ?",
+        )
+        .bind(active_mapping_id.to_string())
+        .bind(device_type)
+        .bind(device_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Internal(e.to_string()))?
+        .rows_affected();
+        Ok(rows > 0)
+    }
+
+    /// Delete a cycle row.
+    pub async fn delete_cycle(
+        &self,
+        device_type: &str,
+        device_id: &str,
+    ) -> Result<bool, StoreError> {
+        let rows = sqlx::query("DELETE FROM device_cycles WHERE device_type = ? AND device_id = ?")
+            .bind(device_type)
+            .bind(device_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Internal(e.to_string()))?
+            .rows_affected();
+        Ok(rows > 0)
     }
 
     /// Fetch every mapping belonging to `edge_id`. Used by `/ws/edge` to build
@@ -184,6 +276,27 @@ impl MappingStore for SqliteStore {
 
         Ok(rows > 0)
     }
+}
+
+/// (device_type, device_id, cycle_gesture, active_mapping_id, mapping_ids_json)
+type DeviceCycleRow = (String, String, Option<String>, Option<String>, String);
+
+fn row_to_cycle(row: DeviceCycleRow) -> Result<DeviceCycle, StoreError> {
+    let (device_type, device_id, cycle_gesture, active_mapping_id, mapping_ids_json) = row;
+    let mapping_ids: Vec<uuid::Uuid> = serde_json::from_str(&mapping_ids_json)
+        .map_err(|e| StoreError::Internal(format!("device_cycles mapping_ids_json: {e}")))?;
+    let active_mapping_id = active_mapping_id
+        .as_deref()
+        .map(uuid::Uuid::parse_str)
+        .transpose()
+        .map_err(|e| StoreError::Internal(format!("device_cycles active_mapping_id: {e}")))?;
+    Ok(DeviceCycle {
+        device_type,
+        device_id,
+        mapping_ids,
+        active_mapping_id,
+        cycle_gesture,
+    })
 }
 
 /// Tuple shape returned by every `SELECT … FROM templates` query.

@@ -16,10 +16,25 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 
 use weave_contracts::{
-    EdgeConfig, EdgeToServer, Mapping as ContractMapping, ServerToEdge, UiFrame,
+    DeviceCycle as ContractDeviceCycle, EdgeConfig, EdgeToServer, Mapping as ContractMapping,
+    ServerToEdge, UiFrame,
 };
+use weave_engine::mapping::DeviceCycle as EngineDeviceCycle;
 
 use crate::ctx::AppCtx;
+
+/// Round-trip the engine's `DeviceCycle` through the contract shape.
+/// Field names line up by design; this is a one-shot conversion that
+/// `serde_json::to_value` makes explicit.
+fn cycle_engine_to_contract(c: EngineDeviceCycle) -> ContractDeviceCycle {
+    ContractDeviceCycle {
+        device_type: c.device_type,
+        device_id: c.device_id,
+        mapping_ids: c.mapping_ids,
+        active_mapping_id: c.active_mapping_id,
+        cycle_gesture: c.cycle_gesture,
+    }
+}
 
 const OUTBOX_CAPACITY: usize = 128;
 /// Cadence at which the server pings each edge to measure ws round-trip
@@ -151,11 +166,27 @@ async fn handle_edge_text(
 
             let glyph_set = ctx.store.list_glyphs().await.unwrap_or_default();
 
+            // Include only the cycles for devices owned by this edge so
+            // the local routing engine can apply active filtering. Device
+            // ownership is identified via mapping.edge_id; collect the
+            // device keys this edge owns and intersect with the cycle list.
+            let owned_devices: std::collections::HashSet<(String, String)> = contract_mappings
+                .iter()
+                .map(|m| (m.device_type.clone(), m.device_id.clone()))
+                .collect();
+            let all_cycles = ctx.store.list_cycles().await.unwrap_or_default();
+            let edge_cycles: Vec<_> = all_cycles
+                .into_iter()
+                .filter(|c| owned_devices.contains(&(c.device_type.clone(), c.device_id.clone())))
+                .map(cycle_engine_to_contract)
+                .collect();
+
             let frame = ServerToEdge::ConfigFull {
                 config: EdgeConfig {
                     edge_id: eid,
                     mappings: contract_mappings,
                     glyphs: glyph_set,
+                    device_cycles: edge_cycles,
                 },
             };
             let Ok(json) = serde_json::to_string(&frame) else {
@@ -227,6 +258,27 @@ async fn handle_edge_text(
                 service_target = %service_target,
                 applied,
                 "edge-driven target switch"
+            );
+        }
+        EdgeToServer::SwitchActiveConnection {
+            device_type,
+            device_id,
+            active_mapping_id,
+        } => {
+            let applied = crate::api::apply_cycle_switch_active(
+                ctx,
+                &device_type,
+                &device_id,
+                active_mapping_id,
+            )
+            .await;
+            tracing::info!(
+                edge_id = ?edge_id,
+                %device_type,
+                %device_id,
+                %active_mapping_id,
+                applied,
+                "edge-driven cycle active switch"
             );
         }
         EdgeToServer::Command {
