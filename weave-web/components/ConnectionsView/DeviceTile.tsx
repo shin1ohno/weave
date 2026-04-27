@@ -13,6 +13,7 @@ import {
 } from "@/lib/api";
 import type { DeviceSummary } from "@/lib/devices";
 import type { LastInput } from "@/lib/ws";
+import { CycleSection } from "./CycleSection";
 import { NuimoViz } from "./NuimoViz";
 
 interface Props {
@@ -251,6 +252,10 @@ export function DeviceTile({
                 : ""}
             </div>
           )}
+          <CycleSection
+            deviceType={device.device_type}
+            deviceId={device.device_id}
+          />
         </div>
       </div>
     </div>
