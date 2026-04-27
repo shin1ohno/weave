@@ -259,10 +259,15 @@ impl StateHub {
             .filter(|info| info.online && info.capabilities.iter().any(|c| c == service_type))
             .collect();
         // Highest version first, then alphabetical edge_id as tiebreak.
+        // Versions are parsed as semver — naive `String::cmp` ranks
+        // "0.9.0" above "0.12.0" lexicographically and would route
+        // intents to a stale binary that lacks `DispatchIntent`.
+        // Unparseable versions sort as `(0, 0, 0)` so they lose to
+        // anything well-formed.
         candidates.sort_by(|a, b| {
-            b.version
-                .cmp(&a.version)
-                .then_with(|| a.edge_id.cmp(&b.edge_id))
+            let av = parse_semver(&a.version).unwrap_or((0, 0, 0));
+            let bv = parse_semver(&b.version).unwrap_or((0, 0, 0));
+            bv.cmp(&av).then_with(|| a.edge_id.cmp(&b.edge_id))
         });
         candidates.first().map(|info| info.edge_id.clone())
     }
@@ -300,4 +305,64 @@ fn parse_semver(s: &str) -> Option<(u32, u32, u32)> {
     let minor = it.next()?.parse().ok()?;
     let patch = it.next()?.split('-').next()?.parse().ok()?;
     Some((major, minor, patch))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_semver_handles_pre_release_suffix() {
+        assert_eq!(parse_semver("0.13.0"), Some((0, 13, 0)));
+        assert_eq!(parse_semver("1.2.3-alpha"), Some((1, 2, 3)));
+        assert_eq!(parse_semver("not-a-version"), None);
+    }
+
+    #[test]
+    fn find_edge_for_service_picks_highest_semver_not_lexicographic() {
+        // Regression: `String::cmp` ranks "0.9.0" above "0.12.0"
+        // lexicographically because '9' > '1', which would route
+        // dispatched intents to a stale binary that lacks the receive
+        // handler for `ServerToEdge::DispatchIntent` (added in 0.10.0).
+        let hub = StateHub::new();
+        for (eid, version) in [("air", "0.9.0"), ("neo", "0.10.0"), ("pro", "0.12.0")] {
+            hub.mark_online(eid.to_string(), version.to_string(), vec!["roon".into()]);
+        }
+        assert_eq!(hub.find_edge_for_service("roon").as_deref(), Some("pro"));
+    }
+
+    #[test]
+    fn find_edge_for_service_breaks_ties_alphabetically() {
+        let hub = StateHub::new();
+        for eid in ["pro", "air", "neo"] {
+            hub.mark_online(eid.to_string(), "0.12.0".to_string(), vec!["roon".into()]);
+        }
+        assert_eq!(hub.find_edge_for_service("roon").as_deref(), Some("air"));
+    }
+
+    #[test]
+    fn find_edge_for_service_skips_offline_edges() {
+        let hub = StateHub::new();
+        hub.mark_online("pro".to_string(), "0.12.0".to_string(), vec!["roon".into()]);
+        hub.mark_online("air".to_string(), "0.13.0".to_string(), vec!["roon".into()]);
+        hub.mark_offline("air");
+        assert_eq!(hub.find_edge_for_service("roon").as_deref(), Some("pro"));
+    }
+
+    #[test]
+    fn edges_at_least_filters_by_minimum_version() {
+        let hub = StateHub::new();
+        hub.mark_online("air".to_string(), "0.9.0".to_string(), vec![]);
+        hub.mark_online("neo".to_string(), "0.10.0".to_string(), vec![]);
+        hub.mark_online("pro".to_string(), "0.13.0".to_string(), vec![]);
+        let qualifying = hub.edges_at_least((0, 13, 0));
+        assert_eq!(qualifying, vec!["pro".to_string()]);
+    }
+
+    #[test]
+    fn edges_at_least_excludes_unparseable_versions() {
+        let hub = StateHub::new();
+        hub.mark_online("weird".to_string(), "garbage".to_string(), vec![]);
+        assert!(hub.edges_at_least((0, 1, 0)).is_empty());
+    }
 }
