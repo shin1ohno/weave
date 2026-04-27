@@ -209,8 +209,26 @@ async fn handle_edge_text(
                     &service_type,
                     &target,
                     &property,
-                    output_id,
-                    value,
+                    output_id.clone(),
+                    value.clone(),
+                );
+                // Cross-edge feedback echo: peer edges (e.g. iPad whose
+                // Nuimo dispatched the intent that produced this state)
+                // need the state to render LED feedback. Server is the
+                // only point that sees both the publisher and the
+                // consumers, so it broadcasts the State to every other
+                // /ws/edge connection. Receiving edges filter by their
+                // own mappings — surplus traffic is harmless.
+                ctx.broker.broadcast_except(
+                    eid,
+                    ServerToEdge::ServiceState {
+                        edge_id: eid.to_string(),
+                        service_type,
+                        target,
+                        property,
+                        output_id,
+                        value,
+                    },
                 );
             }
         }
