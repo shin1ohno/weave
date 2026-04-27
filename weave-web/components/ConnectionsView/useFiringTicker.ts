@@ -36,9 +36,13 @@ export function useFiringTicker() {
     const input = extractInputName(frame.value);
     if (!input) return;
 
+    // Match on (device_type, device_id) only — the same physical device
+    // may be reported by multiple edges (Hue Tap Dial visible to every
+    // edge with `hue` capability), and the mapping's edge_id is just the
+    // one we picked to handle routing. Either side firing the same input
+    // should light up the rule.
     const matching: Mapping[] = mappings.filter(
       (m) =>
-        m.edge_id === frame.edge_id &&
         m.device_type === frame.device_type &&
         m.device_id === frame.device_id &&
         m.routes.some((r) => r.input === input)
