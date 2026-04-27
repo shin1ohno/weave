@@ -55,27 +55,6 @@ impl PushBroker {
         delivered
     }
 
-    /// Send `frame` to every connected edge except the one named in
-    /// `except_edge_id`. Returns the number of edges that received the
-    /// frame. Used for cross-edge fan-out (e.g. forwarding service_state
-    /// from the publisher edge to its peers).
-    pub fn broadcast_except(&self, except_edge_id: &str, frame: ServerToEdge) -> usize {
-        let senders: Vec<_> = {
-            let g = self.senders.lock().unwrap();
-            g.iter()
-                .filter(|(eid, _)| eid.as_str() != except_edge_id)
-                .map(|(_, tx)| tx.clone())
-                .collect()
-        };
-        let mut delivered = 0;
-        for tx in &senders {
-            if tx.try_send(frame.clone()).is_ok() {
-                delivered += 1;
-            }
-        }
-        delivered
-    }
-
     #[allow(dead_code)]
     pub fn connected_edges(&self) -> Vec<String> {
         self.senders.lock().unwrap().keys().cloned().collect()
