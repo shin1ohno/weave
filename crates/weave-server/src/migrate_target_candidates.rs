@@ -54,7 +54,11 @@ pub async fn migrate_target_candidates(store: &SqliteStore) -> Result<usize, Sto
                 service_target: cand.target.clone(),
                 routes: cand.routes.clone().unwrap_or_else(|| m.routes.clone()),
                 feedback: m.feedback.clone(),
-                active: true,
+                // Single-active invariant: the origin mapping (m) carries
+                // the cycle's initial active state. Newly expanded
+                // siblings start dormant; cycle gesture / web switch
+                // promotes them later.
+                active: false,
                 target_candidates: Vec::new(),
                 target_switch_on: None,
             };
@@ -171,6 +175,7 @@ mod tests {
         assert_eq!(hue.edge_id, "pro");
         assert!(hue.target_candidates.is_empty());
         assert!(hue.target_switch_on.is_none());
+        assert!(!hue.active, "expanded sibling starts dormant");
 
         let ios = mappings
             .iter()
@@ -178,6 +183,10 @@ mod tests {
             .expect("ios_media mapping created");
         // Inherited routes from origin since cand.routes was None.
         assert_eq!(ios.routes.len(), 2);
+        assert!(!ios.active, "expanded sibling starts dormant");
+
+        // Origin keeps active=true (the cycle's initial active member).
+        assert!(origin.active);
 
         let cycle = store
             .get_cycle("nuimo", "dev-1")

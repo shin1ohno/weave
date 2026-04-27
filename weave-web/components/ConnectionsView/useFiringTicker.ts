@@ -8,7 +8,7 @@ import {
   useUIState,
   useWsFrames,
 } from "@/lib/ws";
-import type { DeviceCycle, Mapping } from "@/lib/api";
+import type { Mapping } from "@/lib/api";
 
 /** Drives firing state from incoming WS frames. Two responsibilities:
  *
@@ -31,7 +31,7 @@ import type { DeviceCycle, Mapping } from "@/lib/api";
  * shape. */
 export function useFiringTicker() {
   const dispatch = useUIDispatch();
-  const { mappings, deviceCycles } = useUIState();
+  const { mappings } = useUIState();
   const firing = useFiringMappingIds();
   const lastInputByDevice = useLastInputByDevice();
 
@@ -42,32 +42,22 @@ export function useFiringTicker() {
     const input = extractInputName(frame.value);
     if (!input) return;
 
-    // Match on (device_type, device_id) — the same physical device may
-    // be reported by multiple edges (Hue Tap Dial visible to every edge
-    // with `hue` capability), and the mapping's edge_id is just the one
-    // we picked to handle routing.
-    let matching: Mapping[] = mappings.filter(
+    // Match on (device_type, device_id, has-matching-route, active=true).
+    // `mapping.active` is the source of truth for "currently routing"
+    // post the single-active-per-device invariant, so the firing
+    // highlight matches what the engine actually dispatches. Non-active
+    // siblings stay dormant in the UI just like in the engine.
+    const matching: Mapping[] = mappings.filter(
       (m) =>
         m.device_type === frame.device_type &&
         m.device_id === frame.device_id &&
+        m.active &&
         m.routes.some((r) => r.input === input)
     );
 
-    // Cycle-aware filter: when the device has a DeviceCycle, only the
-    // active mapping actually fires (per server + edge engine). Other
-    // cycle members and non-cycle mappings on this device sit dormant —
-    // highlighting them as firing would be a UX lie. For devices
-    // without a cycle, all matching mappings fire (legacy behavior
-    // preserved).
-    const cycle = lookupCycle(deviceCycles, frame.device_type, frame.device_id);
-    if (cycle && cycle.active_mapping_id) {
-      const activeId = cycle.active_mapping_id;
-      matching = matching.filter((m) => m.mapping_id === activeId);
-    }
-
     // Always dispatch — `mapping_ids` may be empty for an unmapped
-    // device or a cycle with no active; the reducer still updates
-    // `lastInputByDevice` so the tile shows the press visually.
+    // device; the reducer still updates `lastInputByDevice` so the tile
+    // shows the press visually.
     dispatch({
       kind: "fire_mapping",
       mapping_ids: matching.map((m) => m.mapping_id),
@@ -111,10 +101,3 @@ function extractInputName(value: any): string | null {
   return null;
 }
 
-function lookupCycle(
-  cycles: Record<string, DeviceCycle>,
-  deviceType: string,
-  deviceId: string
-): DeviceCycle | null {
-  return cycles[`${deviceType}/${deviceId}`] ?? null;
-}

@@ -1,6 +1,7 @@
 mod api;
 mod ctx;
 mod devices;
+mod enforce_single_active;
 mod glyphs;
 mod migrate_target_candidates;
 mod mqtt;
@@ -58,6 +59,10 @@ async fn main() -> anyhow::Result<()> {
             "migrated legacy target_candidates → device_cycles"
         );
     }
+    // Single-active-per-device invariant: for every (device_type, device_id)
+    // bucket with N>=2 mappings, exactly one carries `mapping.active = true`.
+    // Idempotent — re-runs are no-ops once the invariant holds.
+    let _ = enforce_single_active::enforce_single_active_invariant(&store).await?;
 
     let engine = Arc::new(RoutingEngine::new());
     let mappings = store.list_mappings().await?;
