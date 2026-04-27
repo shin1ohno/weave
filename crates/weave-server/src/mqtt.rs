@@ -166,15 +166,33 @@ fn parse_device_topic(topic: &str, payload: &[u8]) -> Option<DeviceEvent> {
     })
 }
 
-/// Publish a routed intent to the service command topic.
+/// Publish a routed intent to the service command topic. CycleSwitch
+/// sentinels are ignored on the MQTT bridge path — cycle advancement
+/// from MQTT-only input sources is a follow-up; edge-agent handles cycle
+/// gestures locally in the meantime.
 async fn publish_intent(client: &AsyncClient, routed: &RoutedIntent) {
+    let (service_type, service_target, intent) = match routed {
+        RoutedIntent::Dispatch {
+            service_type,
+            service_target,
+            intent,
+            ..
+        } => (service_type, service_target, intent),
+        RoutedIntent::CycleSwitch { .. } => {
+            tracing::debug!(
+                ?routed,
+                "cycle gesture observed via MQTT bridge; cycle advancement not implemented on this path"
+            );
+            return;
+        }
+    };
     let topic = format!(
         "service/{}/{}/command/{}",
-        routed.service_type,
-        routed.service_target,
-        intent_name(&routed.intent),
+        service_type,
+        service_target,
+        intent_name(intent),
     );
-    let payload = serde_json::to_string(&routed.intent).unwrap_or_default();
+    let payload = serde_json::to_string(intent).unwrap_or_default();
     if let Err(e) = client
         .publish(&topic, QoS::AtMostOnce, false, payload)
         .await

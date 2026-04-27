@@ -88,16 +88,11 @@ impl Mapping {
 
     /// Route an input primitive through this mapping's routes.
     /// Returns the first matching intent, or None.
-    ///
-    /// Uses `effective_for(service_target)` so the currently active
-    /// cross-service candidate's route table wins over the mapping's
-    /// defaults.
     pub fn route(&self, input: &InputPrimitive) -> Option<Intent> {
         if !self.active {
             return None;
         }
-        let (_, routes) = self.effective_for(&self.service_target);
-        for route in routes {
+        for route in &self.routes {
             if let Some(intent) = route.apply(input) {
                 return Some(intent);
             }
@@ -111,6 +106,16 @@ impl Mapping {
     /// on the routing hot path should pass the mapping's active
     /// `service_target` to get the right adapter + intent table for the
     /// next emitted intent.
+    ///
+    /// Deprecated: superseded by the device-level `DeviceCycle` model.
+    /// The new flow stores each candidate as its own `Mapping` and uses
+    /// `DeviceCycle::active_mapping_id` to decide which one routes input.
+    /// `target_candidates` / `target_switch_on` are still serde-loaded for
+    /// backward compatibility (the startup migration expands them into
+    /// `DeviceCycle` rows + new mappings); routing no longer consults them.
+    #[deprecated(
+        note = "Use DeviceCycle for cross-service switching; target_candidates is migrated at startup"
+    )]
     pub fn effective_for<'a>(&'a self, target: &str) -> (&'a str, &'a [Route]) {
         let candidate = self.target_candidates.iter().find(|c| c.target == target);
         let service_type = candidate
@@ -120,5 +125,41 @@ impl Mapping {
             .and_then(|c| c.routes.as_deref())
             .unwrap_or(self.routes.as_slice());
         (service_type, routes)
+    }
+}
+
+/// Device-level Connection cycle. When present for a `(device_type,
+/// device_id)`, only the mapping identified by `active_mapping_id` routes
+/// input for that device — other mappings in `mapping_ids` sit dormant
+/// until cycled in. Mappings outside `mapping_ids` are unaffected (cycle
+/// is opt-in; existing all-fire behavior is preserved for devices without
+/// a cycle row).
+///
+/// Mirrors `weave_contracts::DeviceCycle` so the JSON round-trip between
+/// the wire format and this engine type preserves every field.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceCycle {
+    pub device_type: String,
+    pub device_id: String,
+    pub mapping_ids: Vec<Uuid>,
+    #[serde(default)]
+    pub active_mapping_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_gesture: Option<String>,
+}
+
+impl DeviceCycle {
+    /// The mapping ID that should follow `active_mapping_id` in cycle
+    /// order, wrapping at the end. Returns `None` when the cycle is empty
+    /// or active points at a mapping not in `mapping_ids` (treated as a
+    /// soft inconsistency — caller decides whether to reset to head).
+    pub fn next_active(&self) -> Option<Uuid> {
+        if self.mapping_ids.is_empty() {
+            return None;
+        }
+        let active = self.active_mapping_id?;
+        let pos = self.mapping_ids.iter().position(|id| *id == active)?;
+        let next = (pos + 1) % self.mapping_ids.len();
+        Some(self.mapping_ids[next])
     }
 }
