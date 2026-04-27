@@ -7,21 +7,15 @@ import { Plus } from "@/components/icon";
 import {
   useLastInputByDevice,
   useSelectedDevice,
-  useFiringMappingIds,
   useUIState,
 } from "@/lib/ws";
-import {
-  deviceKeyString,
-  deviceForMapping,
-  summarizeDevices,
-} from "@/lib/devices";
+import { deviceKeyString, summarizeDevices } from "@/lib/devices";
 import { InputStreamPanel } from "@/components/InputStreamPanel";
 import { DeviceTile } from "./DeviceTile";
 
 export function DevicesPane() {
   const { deviceStates, mappings } = useUIState();
   const lastInputByDevice = useLastInputByDevice();
-  const firingMappingIds = useFiringMappingIds();
   const [selectedDeviceId, setSelected] = useSelectedDevice();
 
   const devices = useMemo(
@@ -29,17 +23,24 @@ export function DevicesPane() {
     [deviceStates, mappings]
   );
 
-  // A device is "firing" iff any mapping that references it is in the
-  // firingMappingIds set. Compute once per render.
+  // A device tile is "firing" iff `lastInputByDevice` has an entry for
+  // its device_id. Driven directly by input frames in `useFiringTicker`
+  // — works for unmapped devices too (pressing a brand-new Nuimo should
+  // confirm the device is alive even before the user has wired up a
+  // Connection). `useFiringTicker`'s 500ms GC tick dispatches
+  // `clear_input` for entries past their `expiresAt`, which removes the
+  // entry from the slice and re-runs this memo so the tile drops the
+  // firing indicator. Avoids reading the wall clock here, which the
+  // `react-hooks/purity` lint rejects.
   const firingDeviceKeys = useMemo(() => {
     const keys = new Set<string>();
-    for (const m of mappings) {
-      if (!firingMappingIds.has(m.mapping_id)) continue;
-      const dev = deviceForMapping(devices, m);
-      if (dev) keys.add(deviceKeyString(dev));
+    for (const d of devices) {
+      if (lastInputByDevice[d.device_id]) {
+        keys.add(deviceKeyString(d));
+      }
     }
     return keys;
-  }, [mappings, firingMappingIds, devices]);
+  }, [devices, lastInputByDevice]);
 
   return (
     <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
