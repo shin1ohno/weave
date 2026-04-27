@@ -2215,9 +2215,9 @@ dependencies = [
 
 [[package]]
 name = "weave-contracts"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e82ccda1e4d2189fbfae3bce8b8a6f361643796eac8a2f0d4d347962c513770"
+checksum = "18315168337ce5431e4ca15e2398dbf295732ffd9ab86ca108d4e9b5ff663a76"
 dependencies = [
  "serde",
  "serde_json",

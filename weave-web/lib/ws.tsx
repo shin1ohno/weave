@@ -12,6 +12,7 @@ import {
   ReactNode,
 } from "react";
 import {
+  DeviceCycle,
   EdgeInfo,
   ServiceStateEntry,
   DeviceStateEntry,
@@ -61,6 +62,21 @@ interface UIState {
   /** Last observed input per device (by `device_id`). Used for the
    * DeviceTile "last input" line and the ConnectionCard footer. */
   lastInputByDevice: Record<string, LastInput>;
+  /** Device-level Connection cycles. Indexed by `${device_type}/${device_id}`
+   * key for O(1) lookup from selectors. */
+  deviceCycles: Record<string, DeviceCycle>;
+}
+
+function cycleKey(deviceType: string, deviceId: string): string {
+  return `${deviceType}/${deviceId}`;
+}
+
+function indexCycles(cycles: DeviceCycle[]): Record<string, DeviceCycle> {
+  const out: Record<string, DeviceCycle> = {};
+  for (const c of cycles) {
+    out[cycleKey(c.device_type, c.device_id)] = c;
+  }
+  return out;
 }
 
 const emptyState: UIState = {
@@ -75,6 +91,7 @@ const emptyState: UIState = {
   connectionsFilter: "all",
   firingMappingIds: new Set<string>(),
   lastInputByDevice: {},
+  deviceCycles: {},
 };
 
 type Action =
@@ -114,6 +131,7 @@ function applySnapshot(
     deviceStates: snapshot.device_states,
     mappings: snapshot.mappings,
     glyphs: snapshot.glyphs,
+    deviceCycles: indexCycles(snapshot.device_cycles ?? []),
     pendingSwitches: new Set<string>(),
     // Preserve user UI selection across reconnects — the snapshot represents
     // server truth, not user intent.
@@ -312,6 +330,16 @@ function reducer(state: UIState, action: Action): UIState {
           });
           if (!touched) return state;
           return { ...state, edges };
+        }
+        case "device_cycle_changed": {
+          const key = cycleKey(frame.device_type, frame.device_id);
+          const next = { ...state.deviceCycles };
+          if (frame.op === "delete" || !frame.cycle) {
+            delete next[key];
+          } else {
+            next[key] = frame.cycle;
+          }
+          return { ...state, deviceCycles: next };
         }
         default:
           return state;
@@ -539,6 +567,27 @@ export function useLastInputByDevice(): Record<string, LastInput> {
       "useLastInputByDevice must be used inside UIStateProvider"
     );
   return ctx.state.lastInputByDevice;
+}
+
+/** Cycle for a specific device, or `null` if the device has no cycle row. */
+export function useDeviceCycle(
+  deviceType: string,
+  deviceId: string
+): DeviceCycle | null {
+  const ctx = useContext(UIStateContext);
+  if (!ctx)
+    throw new Error("useDeviceCycle must be used inside UIStateProvider");
+  return ctx.state.deviceCycles[cycleKey(deviceType, deviceId)] ?? null;
+}
+
+/** Active mapping ID for a device's cycle. `null` if no cycle, or the cycle
+ * has no active. */
+export function useActiveMappingId(
+  deviceType: string,
+  deviceId: string
+): string | null {
+  const cycle = useDeviceCycle(deviceType, deviceId);
+  return cycle?.active_mapping_id ?? null;
 }
 
 /**

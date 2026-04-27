@@ -18,7 +18,7 @@
 use serde::Serialize;
 use uuid::Uuid;
 use weave_contracts::{
-    CommandResult, DeviceStateEntry, EdgeInfo, ErrorSeverity, Glyph, Mapping, PatchOp,
+    CommandResult, DeviceCycle, DeviceStateEntry, EdgeInfo, ErrorSeverity, Glyph, Mapping, PatchOp,
     ServiceStateEntry, UiFrame, UiSnapshot,
 };
 
@@ -68,6 +68,7 @@ pub struct WebSnapshot {
     pub device_states: Vec<DeviceStateEntry>,
     pub mappings: Vec<Mapping>,
     pub glyphs: Vec<Glyph>,
+    pub device_cycles: Vec<DeviceCycle>,
 }
 
 impl From<UiSnapshot> for WebSnapshot {
@@ -78,6 +79,7 @@ impl From<UiSnapshot> for WebSnapshot {
             device_states: s.device_states,
             mappings: s.mappings,
             glyphs: s.glyphs,
+            device_cycles: s.device_cycles,
         }
     }
 }
@@ -103,6 +105,7 @@ impl WebSnapshot {
             device_states: s.device_states,
             mappings: s.mappings,
             glyphs: s.glyphs,
+            device_cycles: s.device_cycles,
         }
     }
 }
@@ -168,6 +171,12 @@ pub enum WebFrame {
         edge_id: String,
         wifi: Option<u8>,
         latency_ms: Option<u32>,
+    },
+    DeviceCycleChanged {
+        device_type: String,
+        device_id: String,
+        op: PatchOp,
+        cycle: Option<DeviceCycle>,
     },
 }
 
@@ -259,6 +268,17 @@ impl From<UiFrame> for WebFrame {
                 edge_id,
                 wifi,
                 latency_ms,
+            },
+            UiFrame::DeviceCycleChanged {
+                device_type,
+                device_id,
+                op,
+                cycle,
+            } => WebFrame::DeviceCycleChanged {
+                device_type,
+                device_id,
+                op,
+                cycle,
             },
         }
     }

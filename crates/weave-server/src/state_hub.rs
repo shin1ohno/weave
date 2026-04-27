@@ -111,6 +111,7 @@ impl StateHub {
             device_states,
             mappings: Vec::new(),
             glyphs: Vec::new(),
+            device_cycles: Vec::new(),
         }
     }
 
