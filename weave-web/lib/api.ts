@@ -90,12 +90,29 @@ export interface DeviceStateEntry {
   updated_at: string;
 }
 
+export interface DeviceCycle {
+  device_type: string;
+  device_id: string;
+  /** Mapping IDs in cycle order. */
+  mapping_ids: string[];
+  /** Currently active mapping (one of `mapping_ids`). `null` when the cycle
+   * is empty. */
+  active_mapping_id: string | null;
+  /** Snake-case input name (e.g. `"swipe_up"`) that advances active.
+   * `null` = cycle exists but has no on-device gesture binding. */
+  cycle_gesture: string | null;
+}
+
 export interface UiSnapshot {
   edges: EdgeInfo[];
   service_states: ServiceStateEntry[];
   device_states: DeviceStateEntry[];
   mappings: Mapping[];
   glyphs: Glyph[];
+  /** Device-level Connection cycles. When a cycle exists for a (device_type,
+   * device_id), only the active mapping fires — see weave-engine
+   * `RoutingEngine::route` for the filter. */
+  device_cycles: DeviceCycle[];
 }
 
 /** Per-command outcome carried by `UiFrame::Command`. `kind` matches the
@@ -162,6 +179,13 @@ export type UiFrame =
       edge_id: string;
       wifi: number | null;
       latency_ms: number | null;
+    }
+  | {
+      type: "device_cycle_changed";
+      device_type: string;
+      device_id: string;
+      op: "upsert" | "delete";
+      cycle: DeviceCycle | null;
     };
 
 /** Compute absolute WebSocket URL. Called lazily from client code so that
@@ -233,6 +257,70 @@ export async function switchTarget(
     body: JSON.stringify({ service_target: serviceTarget }),
   });
   if (!res.ok) throw new Error(`Failed to switch target: ${res.status}`);
+}
+
+// --- Device cycles ---
+
+export async function getDeviceCycle(
+  deviceType: string,
+  deviceId: string
+): Promise<DeviceCycle | null> {
+  const res = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceId)}/cycle`
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to get cycle: ${res.status}`);
+  return res.json();
+}
+
+export async function putDeviceCycle(
+  deviceType: string,
+  deviceId: string,
+  body: {
+    mapping_ids: string[];
+    active_mapping_id?: string | null;
+    cycle_gesture?: string | null;
+  }
+): Promise<DeviceCycle> {
+  const res = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceId)}/cycle`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!res.ok) throw new Error(`Failed to put cycle: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteDeviceCycle(
+  deviceType: string,
+  deviceId: string
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceId)}/cycle`,
+    { method: "DELETE" }
+  );
+  if (!res.ok && res.status !== 404)
+    throw new Error(`Failed to delete cycle: ${res.status}`);
+}
+
+export async function switchActiveConnection(
+  deviceType: string,
+  deviceId: string,
+  activeMappingId: string
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/devices/${encodeURIComponent(deviceType)}/${encodeURIComponent(deviceId)}/cycle/switch`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active_mapping_id: activeMappingId }),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`Failed to switch active connection: ${res.status}`);
 }
 
 // --- Glyphs ---
