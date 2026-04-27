@@ -27,8 +27,6 @@ import { useRowSelection } from "@/hooks/useRowSelection";
  *   Enter         — default action for selected row (edit mapping if any)
  *   e             — open edit drawer for selected row's primary mapping
  *   n             — new mapping
- *   s             — open SwitchTargetPopover for the selected row, when the
- *                   row has a switch-capable primary mapping
  */
 export function KeyboardBindings() {
   const router = useRouter();
@@ -41,8 +39,7 @@ export function KeyboardBindings() {
     closeHelp,
     toggleHelp,
   } = useCommandUI();
-  const { moveNext, movePrev, getSelectedMeta, requestAction } =
-    useRowSelection();
+  const { moveNext, movePrev, getSelectedMeta } = useRowSelection();
 
   useEffect(() => {
     function isTypingTarget(target: EventTarget | null): boolean {
@@ -138,17 +135,6 @@ export function KeyboardBindings() {
           router.push("/mappings/new");
           return;
         }
-        case "s": {
-          const meta = getSelectedMeta();
-          if (meta?.switchMappingId) {
-            e.preventDefault();
-            requestAction({
-              mappingId: meta.switchMappingId,
-              kind: "switch",
-            });
-          }
-          return;
-        }
         default:
           return;
       }
@@ -167,7 +153,6 @@ export function KeyboardBindings() {
     moveNext,
     movePrev,
     getSelectedMeta,
-    requestAction,
     router,
   ]);
 

@@ -25,11 +25,6 @@ import {
 export interface RowMeta {
   /** Optional default mapping id for Enter / `e` actions. */
   primaryMappingId?: string;
-  /** Optional mapping id the row's SwitchTargetPopover is attached to.
-   *  Only set when the row currently has somewhere to switch to — i.e. the
-   *  row renders a SwitchTargetPopover. Consumed by the `s` keybind and the
-   *  command palette's "Switch target" action. */
-  switchMappingId?: string;
   /** Optional navigation hint for Enter when no mapping is primary. */
   defaultHref?: string;
 }
@@ -41,17 +36,12 @@ interface RegisteredRow extends RowMeta {
 }
 
 /**
- * A one-shot cross-component action request. The requester (KeyboardBindings,
- * CommandPalette) sets this via `requestAction`; the owning component
- * (SwitchTargetPopover) observes the matching id + kind in an effect,
- * performs the action (opening its popover), and calls `consumeAction` to
- * clear the slot. This replaces an earlier CustomEvent draft with an
- * idiomatic React channel that cooperates with render scheduling and tests.
+ * A one-shot cross-component action request. Currently retained as an
+ * empty discriminated union — the only consumer (SwitchTargetPopover)
+ * was retired alongside the device-cycle redesign. Re-add a variant when
+ * a future row-level action needs cross-component dispatch.
  */
-export interface RequestedAction {
-  mappingId: string;
-  kind: "switch";
-}
+export type RequestedAction = never;
 
 interface RowSelectionContextValue {
   selectedId: string | null;
@@ -198,19 +188,17 @@ export function useRowSelection(): RowSelectionContextValue {
 export function useRowSelectionRegistration(params: {
   id: string;
   primaryMappingId?: string;
-  switchMappingId?: string;
   defaultHref?: string;
 }): { isSelected: boolean } {
-  const { id, primaryMappingId, switchMappingId, defaultHref } = params;
+  const { id, primaryMappingId, defaultHref } = params;
   const { selectedId, registerRow, unregisterRow } = useRowSelection();
 
   useEffect(() => {
-    registerRow(id, { primaryMappingId, switchMappingId, defaultHref });
+    registerRow(id, { primaryMappingId, defaultHref });
     return () => unregisterRow(id);
   }, [
     id,
     primaryMappingId,
-    switchMappingId,
     defaultHref,
     registerRow,
     unregisterRow,

@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { Mapping, ServiceStateEntry } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import { SwitchTargetPopover } from "@/components/SwitchTargetPopover";
-import { useKnownTargets } from "@/hooks/useKnownTargets";
 import { useRowSelectionRegistration } from "@/hooks/useRowSelection";
 
 interface Props {
@@ -51,18 +49,10 @@ export function MacRow({ target, properties, controllers }: Props) {
         : null;
 
   const primary = controllers.find((m) => m.active) ?? controllers[0];
-  const knownTargets = useKnownTargets(primary?.service_type ?? "");
-  const canSwitch =
-    !!primary &&
-    ((primary.target_candidates?.length ?? 0) > 0 ||
-      knownTargets.length > 1 ||
-      (knownTargets.length === 1 &&
-        knownTargets[0].target !== primary.service_target));
 
   const { isSelected } = useRowSelectionRegistration({
     id: `mac:macos:${target}`,
     primaryMappingId: primary?.mapping_id,
-    switchMappingId: canSwitch ? primary?.mapping_id : undefined,
   });
 
   return (
@@ -103,7 +93,6 @@ export function MacRow({ target, properties, controllers }: Props) {
               </div>
             </div>
           )}
-          {primary && canSwitch && <SwitchTargetPopover mapping={primary} />}
           {primary && (
             <Link
               href={`/mappings/${primary.mapping_id}/edit`}
