@@ -99,7 +99,8 @@ type Action =
       /** 2s firing window by default — caller may pass a shorter value. */
       ttlMs?: number;
     }
-  | { kind: "unfire_mapping"; mapping_id: string };
+  | { kind: "unfire_mapping"; mapping_id: string }
+  | { kind: "clear_input"; device_id: string };
 
 function applySnapshot(
   prev: UIState,
@@ -204,6 +205,12 @@ function reducer(state: UIState, action: Action): UIState {
       const next = new Set(state.firingMappingIds);
       next.delete(action.mapping_id);
       return { ...state, firingMappingIds: next };
+    }
+    case "clear_input": {
+      if (!(action.device_id in state.lastInputByDevice)) return state;
+      const next = { ...state.lastInputByDevice };
+      delete next[action.device_id];
+      return { ...state, lastInputByDevice: next };
     }
     case "frame": {
       const frame = action.frame;
