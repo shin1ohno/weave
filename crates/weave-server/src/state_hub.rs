@@ -213,6 +213,30 @@ impl StateHub {
         g.edge_metrics.get(edge_id).cloned().unwrap_or_default()
     }
 
+    /// Find an online edge whose Hello capabilities include
+    /// `service_type`. First match wins — when multiple edges advertise
+    /// the same capability, HashMap iteration order picks one. This is
+    /// non-deterministic across processes but stable within a process,
+    /// which is good enough for the current single-roon-edge setup.
+    /// Multi-edge tie-breaking (latency, weight, round-robin) is out
+    /// of scope until we have a second adapter on a second host.
+    ///
+    /// Used by `EdgeToServer::DispatchIntent` forwarding: when an edge
+    /// routes an input but lacks the adapter for the resulting
+    /// `service_type`, the server picks a peer edge with the right
+    /// capability and emits a `ServerToEdge::DispatchIntent`. Returns
+    /// `None` when no online edge advertises the capability — the
+    /// caller fans out a `Command{Err}` frame so the live console
+    /// surfaces the miss.
+    pub fn find_edge_for_service(&self, service_type: &str) -> Option<String> {
+        let g = self.inner.read().unwrap();
+        g.edges
+            .iter()
+            .filter(|(_, info)| info.online && info.capabilities.iter().any(|c| c == service_type))
+            .map(|(eid, _)| eid.clone())
+            .next()
+    }
+
     /// Record an edge-reported wifi reading. Returns the updated
     /// metrics so callers can fan-out the merged shape.
     pub fn record_wifi(&self, edge_id: &str, wifi: Option<u8>) -> EdgeMetrics {

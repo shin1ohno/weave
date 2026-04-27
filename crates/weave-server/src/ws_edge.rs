@@ -267,6 +267,69 @@ async fn handle_edge_text(
                 });
             }
         }
+        EdgeToServer::DispatchIntent {
+            service_type,
+            service_target,
+            intent,
+            params,
+            output_id,
+        } => {
+            // Origin edge routed an input but lacks the adapter. Find a
+            // connected edge whose Hello capabilities include
+            // `service_type` and forward the intent there. The executing
+            // edge will emit `EdgeToServer::Command` after dispatch, so
+            // the live UI sees the actual outcome and latency.
+            //
+            // No capable edge → fan out a `Command{Err}` so the live
+            // console row still surfaces the miss instead of the press
+            // appearing to do nothing.
+            if let Some(target_edge) = ctx.hub.find_edge_for_service(&service_type) {
+                tracing::info!(
+                    source_edge = ?edge_id,
+                    %target_edge,
+                    %service_type,
+                    target = %service_target,
+                    %intent,
+                    "dispatch_intent: forwarding",
+                );
+                let frame = ServerToEdge::DispatchIntent {
+                    service_type: service_type.clone(),
+                    service_target: service_target.clone(),
+                    intent: intent.clone(),
+                    params: params.clone(),
+                    output_id: output_id.clone(),
+                };
+                if !ctx.broker.send_to_edge(&target_edge, frame) {
+                    tracing::warn!(
+                        source_edge = ?edge_id,
+                        %target_edge,
+                        %service_type,
+                        "dispatch_intent: target edge has no active sender",
+                    );
+                }
+            } else {
+                tracing::warn!(
+                    source_edge = ?edge_id,
+                    %service_type,
+                    target = %service_target,
+                    %intent,
+                    "dispatch_intent: no online edge advertises capability",
+                );
+                ctx.hub.broadcast(UiFrame::Command {
+                    edge_id: edge_id.clone().unwrap_or_default(),
+                    service_type,
+                    target: service_target,
+                    intent,
+                    params,
+                    result: weave_contracts::CommandResult::Err {
+                        message: "no edge has matching capability".to_string(),
+                    },
+                    latency_ms: None,
+                    output_id,
+                    at: chrono::Utc::now().to_rfc3339(),
+                });
+            }
+        }
     }
     Ok(())
 }
