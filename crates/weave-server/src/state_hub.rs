@@ -214,12 +214,11 @@ impl StateHub {
     }
 
     /// Find an online edge whose Hello capabilities include
-    /// `service_type`. First match wins — when multiple edges advertise
-    /// the same capability, HashMap iteration order picks one. This is
-    /// non-deterministic across processes but stable within a process,
-    /// which is good enough for the current single-roon-edge setup.
-    /// Multi-edge tie-breaking (latency, weight, round-robin) is out
-    /// of scope until we have a second adapter on a second host.
+    /// `service_type`. Selection is deterministic — prefer the highest
+    /// reported edge-agent version (older edges may lack the receive-
+    /// side handler for `ServerToEdge::DispatchIntent` and silently
+    /// drop forwarded intents during a rolling upgrade), then break
+    /// ties alphabetically by `edge_id`.
     ///
     /// Used by `EdgeToServer::DispatchIntent` forwarding: when an edge
     /// routes an input but lacks the adapter for the resulting
@@ -230,11 +229,18 @@ impl StateHub {
     /// surfaces the miss.
     pub fn find_edge_for_service(&self, service_type: &str) -> Option<String> {
         let g = self.inner.read().unwrap();
-        g.edges
-            .iter()
-            .filter(|(_, info)| info.online && info.capabilities.iter().any(|c| c == service_type))
-            .map(|(eid, _)| eid.clone())
-            .next()
+        let mut candidates: Vec<&weave_contracts::EdgeInfo> = g
+            .edges
+            .values()
+            .filter(|info| info.online && info.capabilities.iter().any(|c| c == service_type))
+            .collect();
+        // Highest version first, then alphabetical edge_id as tiebreak.
+        candidates.sort_by(|a, b| {
+            b.version
+                .cmp(&a.version)
+                .then_with(|| a.edge_id.cmp(&b.edge_id))
+        });
+        candidates.first().map(|info| info.edge_id.clone())
     }
 
     /// Record an edge-reported wifi reading. Returns the updated
