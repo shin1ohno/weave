@@ -207,6 +207,29 @@ impl StateHub {
         let _ = self.tx.send(frame);
     }
 
+    /// Edge IDs whose reported version is ≥ `min_version`. Used by the
+    /// service_state fan-out to skip edges running pre-0.13 binaries
+    /// that would treat the new `ServerToEdge::ServiceState` variant as
+    /// an invalid frame and tear down their WS connection (per the
+    /// `edge_core::ws_client` parse-error path that returns from the
+    /// loop).
+    ///
+    /// `min_version` is parsed as semver (`major.minor.patch`); failed
+    /// parses default to `(0,0,0)` so unknown versions never qualify.
+    pub fn edges_at_least(&self, min_version: (u32, u32, u32)) -> Vec<String> {
+        let g = self.inner.read().unwrap();
+        g.edges
+            .values()
+            .filter(|e| {
+                e.online
+                    && parse_semver(&e.version)
+                        .map(|v| v >= min_version)
+                        .unwrap_or(false)
+            })
+            .map(|e| e.edge_id.clone())
+            .collect()
+    }
+
     /// Read the current metrics for one edge. Returns the default
     /// (`None` for both fields) when nothing has been recorded yet.
     pub fn metrics(&self, edge_id: &str) -> EdgeMetrics {
@@ -269,4 +292,12 @@ impl StateHub {
         let mut g = self.inner.write().unwrap();
         g.edge_metrics.remove(edge_id);
     }
+}
+
+fn parse_semver(s: &str) -> Option<(u32, u32, u32)> {
+    let mut it = s.split('.');
+    let major = it.next()?.parse().ok()?;
+    let minor = it.next()?.parse().ok()?;
+    let patch = it.next()?.split('-').next()?.parse().ok()?;
+    Some((major, minor, patch))
 }

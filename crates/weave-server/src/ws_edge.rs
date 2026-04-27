@@ -214,22 +214,31 @@ async fn handle_edge_text(
                 );
                 // Cross-edge feedback echo: peer edges (e.g. iPad whose
                 // Nuimo dispatched the intent that produced this state)
-                // need the state to render LED feedback. Server is the
-                // only point that sees both the publisher and the
-                // consumers, so it broadcasts the State to every other
-                // /ws/edge connection. Receiving edges filter by their
-                // own mappings — surplus traffic is harmless.
-                ctx.broker.broadcast_except(
-                    eid,
-                    ServerToEdge::ServiceState {
-                        edge_id: eid.to_string(),
-                        service_type,
-                        target,
-                        property,
-                        output_id,
-                        value,
-                    },
-                );
+                // need the state to render LED feedback.
+                //
+                // Only target edges running ≥0.13.0 — the variant was
+                // added in weave-contracts 0.13.0, and pre-0.13 binaries
+                // (e.g. air @ 0.9.0, neo @ 0.10.0, pro @ 0.12.x)
+                // hard-fail their WS loop on unknown variants
+                // (`edge_core::ws_client::handle_server_frame` returns
+                // the parse error and the outer loop exits). That
+                // tears the connection down and triggers a reconnect
+                // storm.
+                let frame = ServerToEdge::ServiceState {
+                    edge_id: eid.to_string(),
+                    service_type,
+                    target,
+                    property,
+                    output_id,
+                    value,
+                };
+                let recipients = ctx.hub.edges_at_least((0, 13, 0));
+                for recipient in recipients {
+                    if recipient == eid {
+                        continue;
+                    }
+                    ctx.broker.send_to_edge(&recipient, frame.clone());
+                }
             }
         }
         EdgeToServer::DeviceState {
