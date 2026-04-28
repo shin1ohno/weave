@@ -19,6 +19,16 @@ export const INPUT_TYPES = [
   "touch_bottom",
   "touch_left",
   "touch_right",
+  // Long-touch (sustained hold on a screen edge). Distinct from touch
+  // — Nuimo emits these on different BLE codes (8..=11 vs 4..=7).
+  "long_touch_top",
+  "long_touch_bottom",
+  "long_touch_left",
+  "long_touch_right",
+  // In-air wave (hand passes above the device without touching). Nuimo
+  // only emits left / right; vertical motion is reported as `hover`.
+  "fly_left",
+  "fly_right",
   "key_press",
   // Numbered buttons (Hue Tap Dial: 1..=4). Other multi-button
   // controllers can reuse the same vocabulary.
@@ -82,6 +92,12 @@ export const GESTURE_KIND: Record<string, "continuous" | "discrete"> = {
   touch_bottom: "discrete",
   touch_left: "discrete",
   touch_right: "discrete",
+  long_touch_top: "discrete",
+  long_touch_bottom: "discrete",
+  long_touch_left: "discrete",
+  long_touch_right: "discrete",
+  fly_left: "discrete",
+  fly_right: "discrete",
   button_1: "discrete",
   button_2: "discrete",
   button_3: "discrete",
@@ -152,6 +168,12 @@ export const GESTURE_LABEL: Record<string, string> = {
   touch_bottom: "touch bottom",
   touch_left: "touch left",
   touch_right: "touch right",
+  long_touch_top: "long touch top",
+  long_touch_bottom: "long touch bottom",
+  long_touch_left: "long touch left",
+  long_touch_right: "long touch right",
+  fly_left: "fly left",
+  fly_right: "fly right",
   key_press: "press a key",
   button_1: "button 1",
   button_2: "button 2",
