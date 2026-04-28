@@ -224,6 +224,32 @@ async fn handle_edge_text(
                 // the parse error and the outer loop exits). That
                 // tears the connection down and triggers a reconnect
                 // storm.
+                //
+                // Further restricted to edges that own an *active*
+                // mapping for `(service_type, service_target)`. Roon
+                // Core fans state for every observed zone, not just
+                // the one the edge dispatched against — without this
+                // prefilter, a Nuimo with multiple roon mappings
+                // (one active "iPad zone", one inactive "Qutest zone")
+                // would render volume_bar from BOTH zones, alternating
+                // on the same LED. Defense-in-depth: the receiving
+                // edge's `mapping_rules_for_target` also filters on
+                // `m.active`, but fan-out trim here keeps the wire
+                // tighter and protects edges still running an older
+                // resolver until they're upgraded.
+                let mut active_recipients: Vec<String> = Vec::new();
+                for recipient in ctx.hub.edges_at_least((0, 13, 0)) {
+                    if recipient == eid {
+                        continue;
+                    }
+                    let mappings = ctx.store.list_by_edge(&recipient).await.unwrap_or_default();
+                    let has_active = mappings.iter().any(|m| {
+                        m.active && m.service_type == service_type && m.service_target == target
+                    });
+                    if has_active {
+                        active_recipients.push(recipient);
+                    }
+                }
                 let frame = ServerToEdge::ServiceState {
                     edge_id: eid.to_string(),
                     service_type,
@@ -232,11 +258,7 @@ async fn handle_edge_text(
                     output_id,
                     value,
                 };
-                let recipients = ctx.hub.edges_at_least((0, 13, 0));
-                for recipient in recipients {
-                    if recipient == eid {
-                        continue;
-                    }
+                for recipient in active_recipients {
                     ctx.broker.send_to_edge(&recipient, frame.clone());
                 }
             }
