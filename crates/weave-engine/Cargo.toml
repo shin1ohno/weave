@@ -1,7 +1,7 @@
 [package]
 name = "weave-engine"
 description = "Routing engine that maps IoT device primitives (rotate, press, swipe) to service intents (play, volume, brightness)"
-version = "0.1.3"
+version = "0.1.4"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
