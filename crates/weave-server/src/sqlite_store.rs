@@ -82,14 +82,6 @@ impl SqliteStore {
         Ok(rows > 0)
     }
 
-    pub async fn glyph_count(&self) -> Result<i64, StoreError> {
-        let (n,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM glyphs")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| StoreError::Internal(e.to_string()))?;
-        Ok(n)
-    }
-
     /// List every device cycle row.
     pub async fn list_cycles(&self) -> Result<Vec<DeviceCycle>, StoreError> {
         let rows: Vec<DeviceCycleRow> = sqlx::query_as(
