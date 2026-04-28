@@ -3,3 +3,10 @@ node_modules/
 .next/
 .claude/
 weave.zip
+
+# Local SQLite database created when running weave-server without
+# WEAVE_DATABASE_URL set (default is sqlite://weave.db?mode=rwc).
+weave.db
+weave.db-journal
+weave.db-wal
+weave.db-shm
