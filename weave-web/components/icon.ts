@@ -36,6 +36,8 @@ import {
   AlertCircle,
   Disc3,
   Trash2,
+  MoveLeft,
+  MoveRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +59,17 @@ export const INPUT_ICON: Record<string, LucideIcon> = {
   touch_bottom: ArrowDown,
   touch_left: ArrowLeft,
   touch_right: ArrowRight,
+  // Long-touch shares directional arrows with touch — the editor label
+  // ("long touch top") carries the duration semantic; an extra glyph
+  // would clutter the dropdown.
+  long_touch_top: ArrowUp,
+  long_touch_bottom: ArrowDown,
+  long_touch_left: ArrowLeft,
+  long_touch_right: ArrowRight,
+  // Fly uses the motion-tail variant so it reads visually distinct from
+  // swipe at a glance.
+  fly_left: MoveLeft,
+  fly_right: MoveRight,
   key_press: Keyboard,
   // Hue Tap Dial: numbered buttons share the same Circle icon as a
   // generic press; each maps to its own route input string.
@@ -114,6 +127,8 @@ export {
   AlertCircle,
   Disc3,
   Trash2,
+  MoveLeft,
+  MoveRight,
 };
 
 export type { LucideIcon };
