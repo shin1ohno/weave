@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/shin1ohno/weave/compare/weave-engine-v0.1.3...weave-engine-v0.1.4) - 2026-04-28
+
+### Other
+
+- [draft] device-level Connection cycle (server-side) ([#53](https://github.com/shin1ohno/weave/pull/53))
+- filter GesturePicker by device_type so Hue Tap Dial buttons surface ([#50](https://github.com/shin1ohno/weave/pull/50))
+- D2 conversation-builder Routes editor + persisted Templates ([#47](https://github.com/shin1ohno/weave/pull/47))
+
 ## [0.1.3](https://github.com/shin1ohno/weave/compare/weave-engine-v0.1.2...weave-engine-v0.1.3) - 2026-04-22
 
 ### Other

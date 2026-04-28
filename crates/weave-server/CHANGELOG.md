@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.6...weave-server-v0.1.7) - 2026-04-28
+
+### Other
+
+- refresh default glyphs with centred bitmaps + senic-hub additions ([#63](https://github.com/shin1ohno/weave/pull/63))
+- prefilter cross-edge ServiceState fan-out by recipient's active mappings ([#61](https://github.com/shin1ohno/weave/pull/61))
+- sort find_edge_for_service candidates by semver, not String ([#60](https://github.com/shin1ohno/weave/pull/60))
+- scope cross-edge service_state fan-out to v0.13.0+ edges ([#59](https://github.com/shin1ohno/weave/pull/59))
+- fan out cross-edge service_state to peer edges ([#58](https://github.com/shin1ohno/weave/pull/58))
+- weave-server + weave-web: enforce single-active-per-device invariant on mapping.active ([#57](https://github.com/shin1ohno/weave/pull/57))
+- [draft] device-level Connection cycle (server-side) ([#53](https://github.com/shin1ohno/weave/pull/53))
+- dedup device tiles + match firing by device_id (Hue Tap Dial multi-edge) ([#52](https://github.com/shin1ohno/weave/pull/52))
+- forward EdgeToServer::DispatchIntent to capability-matching edge ([#51](https://github.com/shin1ohno/weave/pull/51))
+- device control buttons (Connect / Disconnect / Test LED A) in DeviceTile ([#48](https://github.com/shin1ohno/weave/pull/48))
+- D2 conversation-builder Routes editor + persisted Templates ([#47](https://github.com/shin1ohno/weave/pull/47))
+- surface edge wifi + RTT in /ws/ui dashboards ([#46](https://github.com/shin1ohno/weave/pull/46))
+- A2 connections-first design fidelity pass ([#41](https://github.com/shin1ohno/weave/pull/41))
+
 ## [0.1.6](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.5...weave-server-v0.1.6) - 2026-04-26
 
 ### Other
