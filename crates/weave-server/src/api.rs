@@ -517,6 +517,19 @@ async fn push_cycle_active_to_edges(
     active_mapping_id: uuid::Uuid,
 ) {
     let edges = edges_for_device(ctx, device_type, device_id).await;
+    // Resolve the new active mapping's `service_target` to a
+    // human-readable label so edges can render the LED letter hint
+    // without depending on `target_candidates.label` (often empty).
+    let label = ctx
+        .engine
+        .list_mappings()
+        .await
+        .into_iter()
+        .find(|m| m.mapping_id == active_mapping_id)
+        .and_then(|m| {
+            ctx.hub
+                .resolve_display_name(&m.service_type, &m.service_target)
+        });
     for edge_id in edges {
         ctx.broker.send_to_edge(
             &edge_id,
@@ -524,6 +537,7 @@ async fn push_cycle_active_to_edges(
                 device_type: device_type.to_string(),
                 device_id: device_id.to_string(),
                 active_mapping_id,
+                service_target_label: label.clone(),
             },
         );
     }

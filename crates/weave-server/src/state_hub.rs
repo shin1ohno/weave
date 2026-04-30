@@ -143,6 +143,41 @@ impl StateHub {
         });
     }
 
+    /// Resolve a human-readable label for `(service_type, target)` from
+    /// the cached service_states. Returns the first non-empty
+    /// `value["display_name"]` string seen for any entry matching the
+    /// pair (regardless of which edge published it). Falls back to a
+    /// hardcoded shortlist for fixed targets like `apple_music`.
+    ///
+    /// Used by the cycle-switch broadcast to inject
+    /// `service_target_label` into `ServerToEdge::SwitchActiveConnection`
+    /// so edges can render the LED letter hint without needing a
+    /// schema-level label per mapping. Returns `None` when no matching
+    /// state has been observed yet — the receiver falls back to its
+    /// existing local-resolution path.
+    pub fn resolve_display_name(&self, service_type: &str, target: &str) -> Option<String> {
+        // ios_media has a fixed-set target whose display name never
+        // arrives via service_state, so short-circuit.
+        if service_type == "ios_media" && target == "apple_music" {
+            return Some("Apple Music".to_string());
+        }
+        let g = self.inner.read().unwrap();
+        for (key, (value, _)) in g.service_states.iter() {
+            if key.service_type != service_type || key.target != target {
+                continue;
+            }
+            if let Some(name) = value
+                .as_object()
+                .and_then(|o| o.get("display_name"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                return Some(name.to_string());
+            }
+        }
+        None
+    }
+
     pub fn record_service_state(
         &self,
         edge_id: &str,
@@ -316,6 +351,89 @@ mod tests {
         assert_eq!(parse_semver("0.13.0"), Some((0, 13, 0)));
         assert_eq!(parse_semver("1.2.3-alpha"), Some((1, 2, 3)));
         assert_eq!(parse_semver("not-a-version"), None);
+    }
+
+    #[test]
+    fn resolve_display_name_roon_zone() {
+        let hub = StateHub::new();
+        hub.record_service_state(
+            "pro",
+            "roon",
+            "1601859efc8845b201c6363954dca9b432ad",
+            "zone",
+            None,
+            serde_json::json!({"display_name": "Air System", "state": "paused"}),
+        );
+        assert_eq!(
+            hub.resolve_display_name("roon", "1601859efc8845b201c6363954dca9b432ad")
+                .as_deref(),
+            Some("Air System")
+        );
+    }
+
+    #[test]
+    fn resolve_display_name_hue_light() {
+        let hub = StateHub::new();
+        hub.record_service_state(
+            "air",
+            "hue",
+            "bbbd3c4a-1ef3-47c9-a9b9-e55918abc",
+            "on",
+            None,
+            serde_json::json!({"display_name": "Ann's Bedside", "on": true}),
+        );
+        assert_eq!(
+            hub.resolve_display_name("hue", "bbbd3c4a-1ef3-47c9-a9b9-e55918abc")
+                .as_deref(),
+            Some("Ann's Bedside")
+        );
+    }
+
+    #[test]
+    fn resolve_display_name_ios_media_apple_music_hardcoded() {
+        // No service_state recorded; the ios_media short-circuit
+        // covers the fixed-set target name.
+        let hub = StateHub::new();
+        assert_eq!(
+            hub.resolve_display_name("ios_media", "apple_music")
+                .as_deref(),
+            Some("Apple Music")
+        );
+    }
+
+    #[test]
+    fn resolve_display_name_unknown_returns_none() {
+        let hub = StateHub::new();
+        assert_eq!(hub.resolve_display_name("roon", "ghost-zone"), None);
+        // ios_media with a non-apple_music target also yields None.
+        assert_eq!(hub.resolve_display_name("ios_media", "spotify"), None);
+    }
+
+    #[test]
+    fn resolve_display_name_skips_entry_without_display_name() {
+        let hub = StateHub::new();
+        hub.record_service_state(
+            "pro",
+            "roon",
+            "zone-1",
+            "playback",
+            None,
+            serde_json::json!("playing"),
+        );
+        // First entry has a string value (no display_name) — should be
+        // skipped; resolver continues to the next entry.
+        hub.record_service_state(
+            "pro",
+            "roon",
+            "zone-1",
+            "zone",
+            None,
+            serde_json::json!({"display_name": "Living Room"}),
+        );
+        assert_eq!(
+            hub.resolve_display_name("roon", "zone-1").as_deref(),
+            Some("Living Room")
+        );
     }
 
     #[test]
