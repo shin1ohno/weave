@@ -233,7 +233,13 @@ export const FEEDBACK_TEMPLATES_BY_DOMAIN: Record<
       label: "Track name",
       description: "Scroll the currently playing track name",
       glyph: "play",
-      state: "track",
+      // The edge runtime matches `rule.state` against the live publish
+      // property. iOS NowPlayingObserver publishes
+      // `property: "now_playing"` with a composite value `{title, artist, …}`;
+      // the track-scroll feedback path extracts `value.title` from there.
+      // Saving as `"now_playing"` makes the rule match without a runtime
+      // alias step.
+      state: "now_playing",
       feedback_type: "track_scroll",
     },
     {
