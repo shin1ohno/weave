@@ -217,4 +217,9 @@ This system bakes in the following assumptions. If any of them don't hold in you
 
 ## License
 
-MIT. See individual crate `Cargo.toml` for the canonical license declaration (`license = "MIT"` per crate).
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
+
+at your option.
