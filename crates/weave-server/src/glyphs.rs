@@ -258,6 +258,44 @@ fn default_set() -> Vec<Glyph> {
             pattern: String::new(),
             builtin: true,
         },
+        // Speaker silhouette with a diagonal slash through it.
+        // Centred at column 4 to satisfy the bounding-box invariant
+        // (lit cols 1..=7).
+        Glyph {
+            name: "muted".into(),
+            pattern: concat!(
+                "         \n",
+                "   *     \n",
+                "  **     \n",
+                " ***  *  \n",
+                " *** * * \n",
+                " ***  *  \n",
+                "  **     \n",
+                "   *     \n",
+                "         ",
+            )
+            .into(),
+            builtin: false,
+        },
+        // Full 9x9 lit. Rendered briefly (Nuimo's auto-clear takes it
+        // back to dark) for `pulse` rules — visual ack that *something*
+        // changed without specifying what.
+        Glyph {
+            name: "pulse".into(),
+            pattern: concat!(
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********\n",
+                "*********",
+            )
+            .into(),
+            builtin: false,
+        },
     ]
 }
 
