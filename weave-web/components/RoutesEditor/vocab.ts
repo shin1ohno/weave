@@ -196,6 +196,7 @@ export const SERVICE_DOMAIN: Record<
   shelly: "light",
   ikea: "light",
   ios_media: "playback",
+  macos_music: "playback",
 };
 
 export interface FeedbackTemplate {
@@ -301,4 +302,31 @@ export function feedbackTemplatesFor(serviceType: string): FeedbackTemplate[] {
   const primary = FEEDBACK_TEMPLATES_BY_DOMAIN[domain] ?? [];
   if (domain === "generic") return primary;
   return [...primary, ...FEEDBACK_TEMPLATES_BY_DOMAIN.generic];
+}
+
+/**
+ * Default feedback rules to seed a brand-new mapping with, derived from
+ * the service's domain. The user can remove any rule they don't want,
+ * but the typical playback / light experience needs the LED to react
+ * out of the box — without these defaults, a fresh Roon or Music
+ * mapping ships with `feedback: []` and the user discovers a dark
+ * Nuimo on next/prev / volume changes.
+ *
+ * Returns the *primary* domain's templates (volume_bar, playback_glyph,
+ * track_scroll, mute_glyph for playback; brightness_bar, power_glyph
+ * for light). The generic `pulse` fallback is intentionally NOT
+ * included by default — it's an opt-in catch-all the user picks via
+ * the template picker if they want it.
+ */
+export function defaultFeedbackForService(
+  serviceType: string,
+): { state: string; feedback_type: string; mapping: Record<string, never> }[] {
+  const domain = SERVICE_DOMAIN[serviceType] ?? "generic";
+  if (domain === "generic") return [];
+  const templates = FEEDBACK_TEMPLATES_BY_DOMAIN[domain] ?? [];
+  return templates.map((t) => ({
+    state: t.state,
+    feedback_type: t.feedback_type,
+    mapping: {},
+  }));
 }

@@ -15,6 +15,7 @@ import {
   type Mapping,
   type Route,
 } from "@/lib/api";
+import { defaultFeedbackForService } from "@/components/RoutesEditor/vocab";
 import { useUIDispatch, useUIState } from "@/lib/ws";
 
 export type DraftMode = { kind: "new" } | { kind: "edit"; mappingId: string };
@@ -56,19 +57,27 @@ const DEFAULT_NEW_ROUTES: Route[] = [
 ];
 
 export function newMappingDraft(overrides: Partial<Mapping> = {}): Mapping {
+  // Resolve service_type from overrides first so the default feedback
+  // seed matches the actual service domain (Roon / ios_media /
+  // macos_music → playback rules; Hue → light rules; unknown → none).
+  // Empty `feedback` from overrides is honoured — only seed when the
+  // caller didn't supply one at all.
+  const serviceType = overrides.service_type ?? "roon";
+  const feedback =
+    overrides.feedback ?? defaultFeedbackForService(serviceType);
   return {
     mapping_id: "",
     edge_id: "",
     device_type: "nuimo",
     device_id: "",
-    service_type: "roon",
     service_target: "",
     routes: DEFAULT_NEW_ROUTES,
-    feedback: [],
     active: true,
     target_candidates: [],
     target_switch_on: null,
     ...overrides,
+    service_type: serviceType,
+    feedback,
   };
 }
 
