@@ -1,10 +1,10 @@
 # weave
 
-IoT device ↔ service routing infrastructure. Translate physical IoT gestures (Nuimo rotate, button press, swipe, long-press, etc.) into service commands (Roon play/volume, Hue brightness, room target switches). Mappings are configuration — change them without touching code.
+IoT device ↔ service routing infrastructure. Translate physical gestures (Nuimo rotate / button / swipe / touch / long-touch / fly / hover, Hue Tap Dial buttons + dial) into service commands (Roon play/volume, Hue brightness, macOS audio, Apple Music on iPad, room target switches). Mappings are configuration — change them without touching code.
 
 Two independent paths share the same config store:
 
-- **Direct `edge-agent` path** (recommended, low latency): a per-host [`edge-agent`](https://github.com/shin1ohno/edge-agent) binary speaks BLE/USB locally and talks to services via their native SDKs (Roon API, Hue CLIP v2). Round-trip on Nuimo rotate → Roon volume is <10 ms on a LAN.
+- **Direct `edge-agent` path** (recommended, low latency): a per-host [`edge-agent`](https://github.com/shin1ohno/edge-agent) binary speaks BLE locally, consumes Hue v2 SSE for Tap Dial input, and talks to services via their native SDKs (Roon API, Hue CLIP v2) plus an MQTT bridge to the macOS audio host (`macos-hub`) and the iPad media app (`WeaveIos`). Round-trip on Nuimo rotate → Roon volume is <10 ms on a LAN.
 - **MQTT path** (N:N cross-host): device drivers (`nuimo-mqtt`) and service adapters (`roon-hub`) publish/subscribe over an MQTT broker. The routing engine stays on `weave-server`. Useful when you can't run a binary on the device's host.
 
 Both paths pull their mappings from the same `weave-server` HTTP API + SQLite store, so a single Web UI configures everything.
@@ -14,34 +14,43 @@ Both paths pull their mappings from the same `weave-server` HTTP API + SQLite st
 The system spans **four GitHub repos** that build three kinds of artifacts: hardware SDKs, a control-plane server, and per-host edge binaries. Everything meets at `weave-server`, which is the only stateful component.
 
 ```
-Physical devices                 Edges (one per host)                  Control plane              Web UI
-──────────────────               ────────────────────                  ─────────────              ────────
+Physical devices                  Edges (one per host)                 Control plane              Web UI
+──────────────────                ────────────────────                 ─────────────              ────────
 
-  Nuimo (BLE)                                                                                   ┌─────────────┐
-     │                                                                                          │  weave-web  │
-     │  BlueZ / CoreBluetooth                                                                   │  Next.js +  │
-     ▼                                                                                          │  Catalyst   │
-  ┌──────────┐   native SDK    ┌──────────────────┐                    ┌───────────────┐        └──────┬──────┘
-  │ nuimo-rs │◄────────────────┤ edge-agent       │   /ws/edge         │ weave-server  │ /ws/ui        │ HTTP
-  │ (SDK)    │    bluer /      │  ├ edge_core     │ ─────────────────► │  (axum+sqlx)  │ ◄────────────►┤
-  │          │    btleplug     │  ├ adapter_roon  │   ConfigFull       │               │  snapshot     │
-  │ nuimo-   │                 │  ├ adapter_hue   │   ConfigPatch      │  SQLite       │  + frames
-  │ mqtt ──┐ │                 │  └ ws_client     │   GlyphsUpdate     │  mappings     │               │
-  │ (MQTT) │ │                 └───┬────────┬─────┘   TargetSwitch     │  glyphs       │ REST          │
-  └────────┼─┘                     │        │         ◄── State (pump) │  edges        │ ◄─────────────┘
-           │ MQTT                  │ Roon   │ Hue                      │               │
-           ▼                       │ API    │ CLIP v2                  │  /api/*       │
-       ┌────────┐                  ▼        ▼                          └───────────────┘
-       │ mosqui-│          ┌──────────┐  ┌──────────┐
-       │ tto    │          │ roon-rs  │  │ (Hue     │
-       └───┬────┘          │ (SDK)    │  │  bridge) │
-           │ MQTT          │          │  └──────────┘
-           ▼               │ roon-hub │
-       ┌────────────┐      │ (MQTT    │
-       │ Roon Core  │◄─────┤ bridge)  │
-       │ (Zones,    │      └──────────┘
-       │  Outputs)  │
-       └────────────┘
+  Nuimo × N (BLE)                                                                               ┌─────────────┐
+  Hue Tap Dial (over Hue SSE)                                                                   │  weave-web  │
+  iPad keyboards                                                                                │  Next.js +  │
+     │                                                                                          │  Catalyst   │
+     │  BlueZ / CoreBluetooth / Hue v2 SSE                                                      └──────┬──────┘
+     ▼                                                                                                 │
+  ┌──────────┐   SDK / MQTT   ┌──────────────────────┐                ┌───────────────┐                │ HTTP
+  │ nuimo-rs │◄───────────────┤ edge-agent           │   /ws/edge     │ weave-server  │ /ws/ui         │
+  │ (SDK)    │   bluer /      │  ├ edge_core         │ ──────────────►│  (axum+sqlx)  │ ◄─────────────►┤
+  │          │   btleplug     │  ├ adapter_roon      │  ConfigFull    │               │  snapshot      │
+  │ nuimo-   │                │  ├ adapter_hue       │  ConfigPatch   │  SQLite       │  + frames
+  │ mqtt ──┐ │                │  ├ adapter_macos     │  GlyphsUpdate  │  mappings     │                │
+  │ (MQTT) │ │                │  ├ adapter_ios_media │  TargetSwitch  │  glyphs       │ REST           │
+  └────────┼─┘                │  └ ws_client         │  ◄── State     │  edges        │ ◄──────────────┘
+           │ MQTT             └─┬─────┬─────┬────┬───┘                │               │
+           ▼                    │     │     │    │                    │  /api/*       │
+       ┌────────┐               │ Roon│ Hue │ MQTT (mosquitto)        └───────────────┘
+       │ mosqui-│               │ API │ CLIPv2 + SSE                         ▲
+       │ tto    │◄──────────────┘     ▼     │                                │
+       └───┬────┘              ┌──────────┐ │   ┌──────────────┐            MQTT bridge
+           │ MQTT              │ Hue      │ │   │ macos-hub    │            (optional, ServerToEdge)
+           ▼                   │ Bridge   │ │   │ on Mac       │
+       ┌────────────┐          │ (lights, │ │   │ Core Audio + │
+       │ Roon Core  │◄─────┐   │ Tap Dial)│ │   │ MediaRemote  │
+       │ (Zones)    │      │   └──────────┘ │   └──────────────┘
+       └────────────┘      │                │           ▲
+                           │   ┌──────────┐ │           │ MQTT (service/macos/...)
+                           │   │ roon-hub │ │           │
+                           └───┤ (MQTT    ├─┘   ┌──────────────────┐
+                               │ bridge)  │     │ WeaveIos (iPad)  │
+                               └──────────┘     │ Apple Music ctrl │
+                                                └──────────────────┘
+                                                    │ MQTT
+                                                    ▼ (service/ios_media/...)
 ```
 
 ### Repo → artifact map
@@ -49,9 +58,10 @@ Physical devices                 Edges (one per host)                  Control p
 | Repo | Crates / apps | What ships where |
 |---|---|---|
 | [**shin1ohno/weave**](https://github.com/shin1ohno/weave) (this) | `weave-engine`, `weave-server`, `weave-web` | crates.io (server, engine) + Docker image (web). The control plane. |
-| [**shin1ohno/edge-agent**](https://github.com/shin1ohno/edge-agent) | `weave-contracts`, `edge-agent` | crates.io. Per-host binary + WS protocol types shared with `weave-server`. |
-| [**shin1ohno/nuimo-rs**](https://github.com/shin1ohno/nuimo-rs) | `nuimo`, `nuimo-mqtt` | crates.io. Nuimo BLE SDK (used by `edge-agent`) + optional MQTT bridge. |
+| [**shin1ohno/edge-agent**](https://github.com/shin1ohno/edge-agent) | `weave-contracts`, `edge-core`, `nuimo-protocol`, `weave-ios-core`, `edge-agent` | crates.io. Per-host binary + supporting crates (routing engine, Nuimo wire-format parsers, iOS-side runtime, WS protocol types). The same workspace also ships the `companions/mac/macos-hub` Mac bridge and the SwiftUI `WeaveIos` iPad app under `ios/`. |
+| [**shin1ohno/nuimo-rs**](https://github.com/shin1ohno/nuimo-rs) | `nuimo`, `nuimo-mqtt` | crates.io. Nuimo BLE SDK (used by `edge-agent` for Linux + macOS desktop hosts) + optional MQTT bridge. |
 | [**shin1ohno/roon-rs**](https://github.com/shin1ohno/roon-rs) | `roon-api`, `roon-cli`, `roon-mcp`, `roon-hub` | crates.io. Roon SOOD/MOO SDK (used by `edge-agent`) + `roon-hub` MQTT bridge (pulled via `cargo install` from this repo's compose). |
+| [**shin1ohno/setup**](https://github.com/shin1ohno/setup) | mitamae cookbooks | Per-host config management. Cookbooks `edge-agent`, `macos-hub`, `weave-server` install + wire up everything above on Linux + macOS targets. |
 
 ### End-to-end: one Nuimo rotate tick (direct path)
 
@@ -73,7 +83,10 @@ The MQTT path replaces steps 2–4 / 6–7 with `nuimo-mqtt` ↔ `mosquitto` ↔
 | Situation | Direct `edge-agent` | MQTT |
 |---|---|---|
 | One Nuimo near one host running the Roon Core | ✓ recommended | over-engineered |
-| Nuimo on Mac, Roon Core on Linux NAS, Hue bridge on router | ✓ (run an edge-agent on Mac, one on NAS) | ✓ |
+| Multiple Nuimos on the same host | ✓ (multi-Nuimo supervisor) | possible |
+| Hue Tap Dial as input device | ✓ (forwarded over Hue v2 SSE) | not supported |
+| Mac is the speaker host, Linux owns Roon + Nuimos | ✓ (`macos-hub` bridge over MQTT) | ✓ |
+| iPad as a portable edge for Apple Music | ✓ (`WeaveIos` + `adapter_ios_media`) | not supported |
 | Latency-critical (volume twiddle) | ✓ <10 ms | 20–60 ms + broker hop |
 | Devices / services span 3+ hosts with sparse overlap | reasonable | ✓ better |
 | Zero binary installs on device host | — | ✓ (MQTT-only) |
@@ -96,11 +109,14 @@ Sibling repos:
 
 ## Feature highlights
 
+- **Multiple input controllers per edge**: one Linux host can supervise N Nuimos (each with independent BLE session, event loop, feedback pump, and reconnect cycle) plus any Hue Tap Dial Switches paired to the bridge. Hot-plug works — a Nuimo powered on after edge-agent startup is picked up automatically.
+- **Multiple service back-ends**: Roon (direct API), Philips Hue (CLIP v2 + bridge SSE for both lights and Tap Dial input), macOS audio (Core Audio output switching + MediaRemote play/pause + system volume, via `macos-hub`), Apple Music on iPad (via the `WeaveIos` companion app over `adapter_ios_media`). Add new `service_type`s by implementing the `ServiceAdapter` trait.
 - **Live config push**: edit a mapping via REST or UI → `ConfigPatch` arrives at the owning edge within one round-trip. No edge-agent restart.
 - **Zone / target switching from the device**: a mapping can declare `target_switch_on` (e.g. `swipe_up`) + a list of `target_candidates`. Swipe to enter mode, rotate to browse, press to commit — selection glyph previewed on the device LED during the pick.
-- **Glyph library**: 132 pre-seeded 9×9 LED glyphs (play/pause/next/previous/link, A–Z, 00–99), auto-populated on every startup; plus a full ASCII grid editor for custom glyphs.
-- **Feedback rules**: service state → device feedback (Roon `playback: playing` → `play` glyph, `paused` → `pause` glyph, volume → parametric volume bar that flips direction for dB-style negative-range zones).
+- **Glyph library**: 138 pre-seeded 9×9 LED glyphs (play/pause/next/previous/link/bulb/light_on/light_off/music_note/shuffle/power_off, A–Z, 00–99), centred to the matrix middle and auto-refreshed on every startup so bitmap revisions propagate without a DB wipe; plus a full ASCII grid editor for custom glyphs.
+- **Feedback rules**: service state → device feedback (Roon `playback: playing` → `play` glyph, `paused` → `pause` glyph, volume → parametric volume bar that flips direction for dB-style negative-range zones; Hue `on=true` → `bulb`, `on=false` → `light_off`).
 - **Service-aware volume rendering**: linear 0..N zones fill the LED bottom-up; dB zones (max=0, min<0) fill top-down so `0 dB` reads as "top indicator on, bar hanging down" instead of "empty bar".
+- **Full upstream Nuimo gesture vocabulary**: button (down/up), rotate, swipe (×4 directions, physical surface), touch + long-touch (×4 edges), fly (×2 directions, in-air wave above the device — distinct from swipe), hover proximity, battery level. Hue Tap Dial adds `button_1..=4` + rotate.
 - **Multi-stage glyph picker** in the Web UI (All / Letters / Numbers / Other → glyph select → inline preview) for candidate + feedback rule editing.
 
 ## Quick start
