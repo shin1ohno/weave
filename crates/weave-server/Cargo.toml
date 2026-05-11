@@ -28,4 +28,18 @@ async-trait = "0.1"
 thiserror = { workspace = true }
 tower-http = { version = "0.6", features = ["cors"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# OpenTelemetry — OTLP gRPC export to the standalone apm-server LXC
+# (apm-server.home.local:8200, TLS, ApiKey auth). Gated by an env var
+# (OTEL_EXPORTER_OTLP_ENDPOINT) at runtime so unit tests / local runs
+# without apm-server keep working: if the env var is unset, init_telemetry
+# falls back to the existing fmt::init() path.
+opentelemetry = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic", "tls", "tls-roots"] }
+tracing-opentelemetry = "0.28"
+# tonic is re-exported indirectly by opentelemetry-otlp[grpc-tonic] but we
+# need tonic::metadata types directly to build the OTLP header map.
+# Version pinned to match opentelemetry-otlp 0.27's transitive dep.
+tonic = { version = "0.12", default-features = false }
