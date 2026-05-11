@@ -19,7 +19,7 @@ use std::sync::Arc;
 use axum::routing::get;
 use axum::Router;
 use tower_http::cors::CorsLayer;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use weave_engine::{MappingStore, RoutingEngine};
 
 use crate::ctx::AppCtx;
@@ -118,11 +118,13 @@ async fn main() -> anyhow::Result<()> {
 
     // TraceLayer creates one `http_request` span per inbound HTTP
     // request. tracing-opentelemetry then exports those spans through
-    // the BatchSpanProcessor configured in telemetry::init. Without
-    // this layer the OTel pipeline is correctly wired but receives
-    // zero spans — `tracing::info!` events alone don't materialize as
-    // exportable spans (they attach to whatever span is currently
-    // active in the task, and the axum handlers have none by default).
+    // the BatchSpanProcessor configured in telemetry::init.
+    //
+    // DefaultMakeSpan defaults to Level::DEBUG, which the registry's
+    // EnvFilter (`RUST_LOG=info`) drops before either the fmt layer or
+    // the otel_layer sees it — net result is zero exports despite the
+    // pipeline being correctly wired end-to-end. Pin span level to
+    // INFO so the spans pass the filter and reach BatchSpanProcessor.
     let app: Router = Router::new()
         .merge(api::router())
         .merge(devices::router())
@@ -132,7 +134,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/ws/ui", get(ws_ui::handler))
         .with_state(ctx)
         .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http());
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(tracing::Level::INFO)),
+        );
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", api_port)).await?;
     tracing::info!(api_port, "HTTP + WS listening");
