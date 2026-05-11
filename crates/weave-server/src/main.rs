@@ -8,6 +8,7 @@ mod mqtt;
 mod push_broker;
 mod sqlite_store;
 mod state_hub;
+mod telemetry;
 mod templates;
 mod web_view;
 mod ws_edge;
@@ -27,7 +28,7 @@ use crate::state_hub::StateHub;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    telemetry::init()?;
 
     let database_url =
         std::env::var("WEAVE_DATABASE_URL").unwrap_or_else(|_| "sqlite://weave.db?mode=rwc".into());
@@ -129,5 +130,6 @@ async fn main() -> anyhow::Result<()> {
 
     axum::serve(listener, app).await?;
 
+    telemetry::shutdown();
     Ok(())
 }

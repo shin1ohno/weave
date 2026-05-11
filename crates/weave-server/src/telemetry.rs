@@ -1,0 +1,114 @@
+// OpenTelemetry initialization for weave-server.
+//
+// At process start, if `OTEL_EXPORTER_OTLP_ENDPOINT` is set in the env
+// (e.g. `https://apm-server.home.local:8200`), exports tracing spans
+// via OTLP/gRPC to that endpoint. Auth is via `Authorization: ApiKey
+// <encoded>` header pulled from `OTEL_EXPORTER_OTLP_HEADERS` (canonical
+// OTel SDK env). Resource attributes (`service.name`,
+// `service.version`, `deployment.environment`) come from
+// `OTEL_SERVICE_NAME` / `OTEL_RESOURCE_ATTRIBUTES` if set; otherwise
+// defaults below.
+//
+// If the env var is unset (unit tests, ad-hoc local runs), falls back
+// to the plain `tracing_subscriber::fmt::init()` path the binary used
+// before — no OTLP traffic, console logging unchanged.
+
+use anyhow::Context;
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry::KeyValue;
+use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
+use opentelemetry_sdk::trace::TracerProvider;
+use opentelemetry_sdk::Resource;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
+
+const SERVICE_NAME: &str = "weave-server";
+
+pub fn init() -> anyhow::Result<()> {
+    let otlp_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+
+    if otlp_endpoint.is_none() {
+        // No APM target configured — keep the original behavior so unit
+        // tests + local dev runs work without an apm-server.
+        tracing_subscriber::fmt::init();
+        return Ok(());
+    }
+
+    opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
+
+    let mut exporter_builder = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(otlp_endpoint.as_deref().unwrap());
+
+    // OTLP_HEADERS env is the canonical SDK input. Parse manually
+    // because the SDK env-parse path only picks up some headers in 0.27.
+    if let Ok(raw_headers) = std::env::var("OTEL_EXPORTER_OTLP_HEADERS") {
+        let metadata = parse_headers(&raw_headers).context("parsing OTEL_EXPORTER_OTLP_HEADERS")?;
+        exporter_builder = exporter_builder.with_metadata(metadata);
+    }
+
+    let exporter = exporter_builder
+        .build()
+        .context("building OTLP span exporter")?;
+
+    let service_version = env!("CARGO_PKG_VERSION");
+    let env_label = std::env::var("DEPLOYMENT_ENVIRONMENT").unwrap_or_else(|_| "home".into());
+
+    let provider = TracerProvider::builder()
+        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+        .with_resource(Resource::new(vec![
+            KeyValue::new("service.name", SERVICE_NAME),
+            KeyValue::new("service.version", service_version),
+            KeyValue::new("deployment.environment", env_label),
+        ]))
+        .build();
+
+    let tracer = provider.tracer(SERVICE_NAME);
+    opentelemetry::global::set_tracer_provider(provider);
+
+    let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(tracing_subscriber::fmt::layer())
+        .with(otel_layer)
+        .init();
+
+    tracing::info!(endpoint = %otlp_endpoint.as_deref().unwrap_or(""), "OTel tracer initialized");
+    Ok(())
+}
+
+pub fn shutdown() {
+    // Flush pending spans on graceful shutdown. No-op if init() never
+    // installed a real tracer.
+    opentelemetry::global::shutdown_tracer_provider();
+}
+
+// Parse the W3C-formatted header list from
+// OTEL_EXPORTER_OTLP_HEADERS into a tonic MetadataMap. Format is
+// `key1=value1,key2=value2`. Whitespace around `=` and `,` is trimmed.
+fn parse_headers(raw: &str) -> anyhow::Result<tonic::metadata::MetadataMap> {
+    let mut metadata = tonic::metadata::MetadataMap::new();
+    for pair in raw.split(',') {
+        let pair = pair.trim();
+        if pair.is_empty() {
+            continue;
+        }
+        let (k, v) = pair
+            .split_once('=')
+            .with_context(|| format!("malformed header pair: {pair}"))?;
+        let k = k.trim();
+        let v = v.trim();
+        let key: tonic::metadata::MetadataKey<tonic::metadata::Ascii> = k
+            .parse()
+            .with_context(|| format!("invalid header name: {k}"))?;
+        let value: tonic::metadata::MetadataValue<tonic::metadata::Ascii> = v
+            .parse()
+            .with_context(|| format!("invalid header value for {k}"))?;
+        metadata.insert(key, value);
+    }
+    Ok(metadata)
+}
