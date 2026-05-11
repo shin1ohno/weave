@@ -42,4 +42,4 @@ tracing-opentelemetry = "0.28"
 # tonic is re-exported indirectly by opentelemetry-otlp[grpc-tonic] but we
 # need tonic::metadata types directly to build the OTLP header map.
 # Version pinned to match opentelemetry-otlp 0.27's transitive dep.
-tonic = { version = "0.12", default-features = false }
+tonic = { version = "0.12", default-features = false, features = ["transport", "tls", "tls-roots"] }
