@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.8...weave-server-v0.1.9) - 2026-05-11
+
+### Other
+
+- pin TraceLayer span level to INFO so EnvFilter passes them ([#74](https://github.com/shin1ohno/weave/pull/74))
+- add tower-http TraceLayer for HTTP span instrumentation ([#73](https://github.com/shin1ohno/weave/pull/73))
+- support OTEL_EXPORTER_OTLP_CERTIFICATE env for OTLP TLS CA ([#72](https://github.com/shin1ohno/weave/pull/72))
+- OTel OTLP export to apm-server.home.local:8200 ([#70](https://github.com/shin1ohno/weave/pull/70))
+
 ## [0.1.8](https://github.com/shin1ohno/weave/compare/weave-server-v0.1.7...weave-server-v0.1.8) - 2026-05-01
 
 ### Other
